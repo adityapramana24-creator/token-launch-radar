@@ -28,8 +28,9 @@ farm plan for each, on a static dashboard that renders with no network.
 - `lib/model.ts` — the model, the farm plans and the snapshot parser.
 - `dashboard/` — the static page (`index.html`, `radar.css`, `radar.js`).
 - `screenshots/` — the board, a detail view and a filtered view. The three
-  renders are stored as base64 text (`*.png.b64`) so the repository stays
-  text-only; `main.ts` decodes them back into real PNGs in `/output`.
+  renders are stored as single-line base64 text (`*.png.b64`, as in a data
+  URI) so the repository stays text-only; `main.ts` decodes them back into
+  real PNGs in `/output`.
 - `vendor/makefun-board.ts` — make.fun's dossier library, as shipped in the kit.
 
 ## Run it

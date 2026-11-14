@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch Radar: pre-token protocols ranked by implied value</title>
+<meta name="description" content="A token launch radar: every pre-token DefiLlama protocol ranked by implied value, with a farm plan for each.">
+<link rel="stylesheet" href="radar.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <div class="brand"><span class="sweep" aria-hidden="true"></span><span class="brand-name">Launch Radar</span><span class="brand-tag">token-radar-01</span></div>
+    <div class="top-meta"><span id="meta-snapshot">Snapshot —</span><span>DefiLlama protocol index</span><span id="meta-model">model —</span></div>
+  </div>
+</header>
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <h1 id="hero-title">Pre-token protocols, ranked by implied value</h1>
+      <p class="lede">The watchlist is the floor: every protocol with at least $50M of TVL and no token on record. The radar adds every other pre-token protocol below that floor, prices each one from the market's own multiples, and shows how to farm it. Implied value is a model, not a promise, and no token here is guaranteed to launch.</p>
+    </div>
+    <div class="facts" id="facts"></div>
+  </section>
+
+  <section class="panel controls" aria-label="Board controls">
+    <div class="field grow">
+      <label for="q">Search</label>
+      <input type="search" id="q" placeholder="Name, slug, category or chain" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="category">Category</label>
+      <select id="category"><option value="all">All categories</option></select>
+    </div>
+    <div class="field">
+      <label for="chain">Chain</label>
+      <select id="chain"><option value="all">All chains</option></select>
+    </div>
+    <div class="field">
+      <span class="lbl">Token status</span>
+      <div class="tabs" role="tablist">
+        <button type="button" id="tab-pre" role="tab" aria-selected="true">Pre-token</button>
+        <button type="button" id="tab-live" role="tab" aria-selected="false">Live token</button>
+      </div>
+    </div>
+    <p class="count" id="count" aria-live="polite"></p>
+  </section>
+
+  <section id="board" aria-busy="true"></section>
+
+  <section class="panel model-strip" id="model-strip" aria-label="How implied value is computed"></section>
+
+  <section class="panel sandbox" id="sandbox" aria-label="Model sandbox">
+    <div class="sandbox-head">
+      <h2>Try the model</h2>
+      <p>Move a slider and the board reprices live. The ranked board in board.json always uses the defaults below.</p>
+    </div>
+    <div class="sliders">
+      <label>Category multiple scale <b id="mult-val">1.00x</b>
+        <input type="range" id="mult-scale" min="0.5" max="2" step="0.05" value="1">
+      </label>
+      <label>Growth weight <b id="growth-val">0.50</b>
+        <input type="range" id="growth-weight" min="0" max="1" step="0.05" value="0.5">
+      </label>
+      <button type="button" id="sandbox-reset" class="btn">Reset to defaults</button>
+    </div>
+    <p class="sandbox-note" id="sandbox-note">Showing the board as ranked: defaults in force.</p>
+  </section>
+
+  <section class="panel note">
+    <h2>How to read this radar</h2>
+    <p><b>Coverage first:</b> every protocol on the snapshot's 40-protocol watchlist is ranked here, plus every other pre-token protocol that passes the watchlist's own test: no wrapped, staked or bridged product of a token that already trades, no exchange product, no versioned pool. <b>The price:</b> each row's multiple is the median market-cap-to-TVL ratio of live-token protocols in its own category, so a category the market prices richly prices its pre-token names richly too; growth and age then move it. <b>The plan:</b> every row carries six farm steps with a cost and a time, derived from its category, chain, size and age. Live-token protocols are set aside in their own tab with their market caps shown, never mixed into the ranking.</p>
+    <p class="fine">Data: a sealed DefiLlama snapshot. "Records no token" means DefiLlama records no token for the protocol; it is not proof none exists. Nothing here is financial advice.</p>
+  </section>
+</main>
+<footer class="wrap foot"><p>Launch Radar — built for make.fun token-radar-01. No network: every byte on this page ships with it.</p></footer>
+<dialog class="detail" id="detail" aria-labelledby="detail-title"></dialog>
+<script src="../data.js"></script>
+<script src="radar.js"></script>
+</body>
+</html>

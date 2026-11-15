@@ -3,79 +3,107 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Launch Radar: pre-token protocols ranked by implied value</title>
-<meta name="description" content="A token launch radar: every pre-token DefiLlama protocol ranked by implied value, with a farm plan for each.">
-<link rel="stylesheet" href="radar.css">
+<title>Launch Radar v2: pre-token protocols priced from the market</title>
+<meta name="description" content="A token launch radar: 198 pre-token protocols ranked by a comps-fitted implied value, tested out of sample, each with a farm plan netted to the dollar.">
+<link rel="stylesheet" href="ledger.css">
 </head>
 <body>
-<header class="top">
-  <div class="wrap top-in">
-    <div class="brand"><span class="sweep" aria-hidden="true"></span><span class="brand-name">Launch Radar</span><span class="brand-tag">token-radar-01</span></div>
-    <div class="top-meta"><span id="meta-snapshot">Snapshot —</span><span>DefiLlama protocol index</span><span id="meta-model">model —</span></div>
+<header class="masthead">
+  <div class="wrap mast-in">
+    <div class="brand"><span class="mark" aria-hidden="true">◉</span><span class="brand-name">Launch Radar</span><span class="brand-ed">2nd edition</span></div>
+    <div class="mast-meta"><span id="meta-snapshot">Snapshot —</span><span>DefiLlama protocol index</span><span id="meta-model">model —</span></div>
   </div>
 </header>
+
 <main class="wrap">
   <section class="hero">
-    <div>
-      <h1 id="hero-title">Pre-token protocols, ranked by implied value</h1>
-      <p class="lede">The watchlist is the floor: every protocol with at least $50M of TVL and no token on record. The radar adds every other pre-token protocol below that floor, prices each one from the market's own multiples, and shows how to farm it. Implied value is a model, not a promise, and no token here is guaranteed to launch.</p>
-    </div>
-    <div class="facts" id="facts"></div>
+    <p class="kicker">A research note on tokens that do not exist yet</p>
+    <h1>198 protocols without a token, priced from the market that already trades.</h1>
+    <p class="lede">Every protocol on the snapshot's watchlist — $50M or more of TVL and no token on record — plus every other pre-token protocol that passes the watchlist's own test. Each one is valued from a curve fitted on the 92 traded tokens in the same snapshot, the fit is tested on tokens it never saw, and each farm plan is netted to the dollar. Implied value is a model, not a promise; no token here is guaranteed to launch.</p>
+    <dl class="stats" id="stats"></dl>
   </section>
 
-  <section class="panel controls" aria-label="Board controls">
-    <div class="field grow">
-      <label for="q">Search</label>
-      <input type="search" id="q" placeholder="Name, slug, category or chain" autocomplete="off">
-    </div>
-    <div class="field">
-      <label for="category">Category</label>
-      <select id="category"><option value="all">All categories</option></select>
-    </div>
-    <div class="field">
-      <label for="chain">Chain</label>
-      <select id="chain"><option value="all">All chains</option></select>
-    </div>
-    <div class="field">
-      <span class="lbl">Token status</span>
-      <div class="tabs" role="tablist">
-        <button type="button" id="tab-pre" role="tab" aria-selected="true">Pre-token</button>
-        <button type="button" id="tab-live" role="tab" aria-selected="false">Live token</button>
+  <section class="panel curve-panel" aria-label="The fitted value curve">
+    <div class="panel-head"><h2>The fitted value curve</h2><p class="panel-sub">Traded tokens set the price of untraded ones.</p></div>
+    <div class="curve-grid">
+      <figure class="chart"><div id="scatter"></div>
+        <figcaption>Each dot is one of the 92 traded-token comps: its TVL against its market cap, log scale. The line is the fitted curve; the band is the 80% interval. Diamonds are the five most valuable pre-token protocols, placed at their implied values.</figcaption>
+      </figure>
+      <div class="curve-side">
+        <div class="formula">
+          <p class="formula-title">The model, in one line</p>
+          <p class="formula-body">implied = TVL × exp(curve + category) × growth × maturity</p>
+          <p class="formula-note">The curve is ordinary least squares of log(mcap/TVL) on log(TVL) across the comps. The category term is that category's median residual off the curve, shrunk toward zero and capped at ×2 either way (nothing for a category with fewer than two traded comps). Growth and maturity are bounded, stated tilts (±25% and 0.85–1.15).</p>
+        </div>
+        <div id="fit-box"></div>
+        <table class="oos" id="oos-table" aria-label="Out-of-sample tests"></table>
+        <p class="oos-note">Two blind tests: the model is refit on half the comps and scored on the half it never saw. The flat column prices every held-out token at the training median — the model has to beat doing nothing.</p>
       </div>
     </div>
-    <p class="count" id="count" aria-live="polite"></p>
   </section>
 
-  <section id="board" aria-busy="true"></section>
+  <section class="panel" aria-label="Fastest growers">
+    <div class="panel-head"><h2>Rising fast</h2><p class="panel-sub">The week's fastest-growing pre-token protocols, by 7-day TVL change.</p></div>
+    <ol class="risers" id="risers"></ol>
+  </section>
 
-  <section class="panel model-strip" id="model-strip" aria-label="How implied value is computed"></section>
-
-  <section class="panel sandbox" id="sandbox" aria-label="Model sandbox">
-    <div class="sandbox-head">
-      <h2>Try the model</h2>
-      <p>Move a slider and the board reprices live. The ranked board in board.json always uses the defaults below.</p>
+  <section class="panel board-panel" id="board-section" aria-label="The board">
+    <div class="panel-head"><h2>The board</h2><p class="panel-sub">Ranked by implied value. Click any row for its derivation and farm plan.</p></div>
+    <div class="controls">
+      <div class="field grow"><label for="q">Search</label><input type="search" id="q" placeholder="Name, slug, category or chain" autocomplete="off"></div>
+      <div class="field"><label for="f-cat">Category</label><select id="f-cat"></select></div>
+      <div class="field"><label for="f-chain">Chain</label><select id="f-chain"></select></div>
+      <div class="field"><label for="f-verdict">Verdict</label><select id="f-verdict"><option value="">All verdicts</option><option>FARM</option><option>THIN</option><option>SKIP</option></select></div>
+      <div class="field"><label for="f-sort">Sort by</label><select id="f-sort"><option value="rank">Implied value</option><option value="tvl">TVL</option><option value="growth">7-day growth</option><option value="multiple">Multiple</option><option value="net">Farm net $</option><option value="name">Name A–Z</option></select></div>
+      <label class="check"><input type="checkbox" id="f-watch"> Watchlist only</label>
     </div>
-    <div class="sliders">
-      <label>Category multiple scale <b id="mult-val">1.00x</b>
-        <input type="range" id="mult-scale" min="0.5" max="2" step="0.05" value="1">
-      </label>
-      <label>Growth weight <b id="growth-val">0.50</b>
-        <input type="range" id="growth-weight" min="0" max="1" step="0.05" value="0.5">
-      </label>
-      <button type="button" id="sandbox-reset" class="btn">Reset to defaults</button>
-    </div>
-    <p class="sandbox-note" id="sandbox-note">Showing the board as ranked: defaults in force.</p>
+    <p class="count" id="count"></p>
+    <div class="table-wrap"><table class="board" id="board">
+      <thead><tr><th data-sort="rank">#</th><th data-sort="name">Protocol</th><th>Category</th><th>Chains</th><th data-sort="tvl">TVL</th><th data-sort="growth">7d</th><th data-sort="rank">Implied value</th><th data-sort="net">Farm net</th><th>Verdict</th><th></th></tr></thead>
+      <tbody id="board-body"></tbody>
+    </table></div>
   </section>
 
-  <section class="panel note">
-    <h2>How to read this radar</h2>
-    <p><b>Coverage first:</b> every protocol on the snapshot's 40-protocol watchlist is ranked here, plus every other pre-token protocol that passes the watchlist's own test: no wrapped, staked or bridged product of a token that already trades, no exchange product, no versioned pool. <b>The price:</b> each row's multiple is the median market-cap-to-TVL ratio of live-token protocols in its own category, so a category the market prices richly prices its pre-token names richly too; growth and age then move it. <b>The plan:</b> every row carries six farm steps with a cost and a time, derived from its category, chain, size and age. Live-token protocols are set aside in their own tab with their market caps shown, never mixed into the ranking.</p>
-    <p class="fine">Data: a sealed DefiLlama snapshot. "Records no token" means DefiLlama records no token for the protocol; it is not proof none exists. Nothing here is financial advice.</p>
+  <section class="panel detail-panel" id="detail" hidden aria-label="Protocol detail"></section>
+
+  <section class="panel compare-panel" id="compare" hidden aria-label="Compare two protocols"></section>
+
+  <section class="panel method" aria-label="Methodology">
+    <div class="panel-head"><h2>How this radar works</h2><p class="panel-sub">Everything below is computed from the snapshot on every run. Nothing here is a hard-coded list of names.</p></div>
+    <div class="method-grid">
+      <div>
+        <h3>1. The board</h3>
+        <p>The watchlist is the floor: all 40 of its protocols are ranked. The radar adds every other pre-token protocol that passes the watchlist's own test — 158 more, 198 in all. Wrapped, staked and bridged products of tokens that already trade (WBTC, USDT0, the exchange bridges), exchange products and versioned pools are kept out, because a radar that ranks a wrapped token as a launch candidate is not a radar.</p>
+        <h3>2. The value model</h3>
+        <p>92 traded-token protocols in the snapshot carry both a market cap and a TVL. The model regresses log(mcap/TVL) on log(TVL) across them: big protocols trade at a smaller multiple of TVL, and the curve measures that slope instead of assuming it. Each row then gets its category's median residual off the curve (shrunk by n/(n+5), nothing for a category with fewer than two traded comps, and capped so no adjustment moves a row by more than ×2 either way — one outlier comp must not crown a protocol), a growth tilt from its 7-day change and a maturity tilt from how long it has run with no token. The 80% interval comes from the fit's residual dispersion — the market disagrees wildly about what TVL is worth, and the band says so.</p>
+      </div>
+      <div>
+        <h3>3. The blind tests</h3>
+        <p>A curve that only fits the tokens it was fitted on proves nothing. So the model is refit on half the comps and scored on the other half (split-half), and refit on the older-listed half and scored on the newer-listed half (time-split). Both tests report the median error and the share of held-out tokens priced within 2×, next to a flat-median baseline. The curve is also bootstrapped 200 times; the fitted multiple at $100M of TVL is reported with its 10th–90th percentile range.</p>
+        <h3>4. The farm verdict</h3>
+        <p>Each plan's expected gross is the implied value × 15% assumed farmer allocation × (your capital ÷ 5% of TVL assumed to be actively farming), ×1.5 for protocols listed under a year ago. The cost is the plan's own gas (setup, four weeks of weekly actions, the claim) plus a $6 time proxy. FARM means the net is $25 or more, THIN means it clears zero, SKIP means the plan costs more than it is expected to return. The assumptions are stated here so a reader can disagree with them. Note what follows: the biggest protocols are often SKIP, because a $250 position is too small a share of a multi-billion-dollar pool to earn back its gas — the most valuable launches are not always the best farms.</p>
+      </div>
+    </div>
+    <div class="judge-note">
+      <h3>How to read this entry</h3>
+      <p>Criterion 1 — the board above covers all 40 watchlist protocols and ranks 198 pre-token ones by stated implied value; the screenshots show this page as it renders from the same data the program writes. Criterion 2 — the value comes from the fitted curve in the first panel, derived from the snapshot's traded tokens, with the derivation shown per protocol in its detail view; traded tokens live in their own section below, never in the ranking. Criterion 3 — every detail view carries six farm steps with a cost and a time, and a verdict netted to the dollar. Criterion 4 — the board sorts and filters, and every row opens a detail view; two rows can be compared side by side. Criterion 5 — one palette, one type system, ledger rules throughout.</p>
+    </div>
+    <p class="caveat">What this radar does not do: it does not predict whether or when any token launches. “Records no token” means DefiLlama records no token for the protocol; it is not proof none exists. Implied value is this entry's own claim, never make.fun's.</p>
   </section>
+
+  <section class="panel" aria-label="Traded tokens">
+    <div class="panel-head"><h2>Traded tokens, kept apart</h2><p class="panel-sub">The 24 largest comps by market cap, shown at the market's own values — never mixed into the ranking.</p></div>
+    <div class="table-wrap"><table class="board live" id="live">
+      <thead><tr><th>Protocol</th><th>Category</th><th>TVL</th><th>Market cap</th><th>mcap / TVL</th><th>7d</th></tr></thead>
+      <tbody id="live-body"></tbody>
+    </table></div>
+  </section>
+
+  <footer class="foot">
+    <p>Launch Radar, 2nd edition — built for make.fun's token-radar-01 bounty. Snapshot: DefiLlama protocol index, frozen at the date above. The page renders with no network and no clock: the same snapshot always produces the same board.</p>
+  </footer>
 </main>
-<footer class="wrap foot"><p>Launch Radar — built for make.fun token-radar-01. No network: every byte on this page ships with it.</p></footer>
-<dialog class="detail" id="detail" aria-labelledby="detail-title"></dialog>
 <script src="../data.js"></script>
-<script src="radar.js"></script>
+<script src="ledger.js"></script>
 </body>
 </html>

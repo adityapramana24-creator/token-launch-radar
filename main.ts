@@ -1,20 +1,20 @@
-// Launch Radar: a token-radar-01 entry (Node 22, standard library only).
+// Launch Radar v2: a token-radar-01 entry (Node 22, standard library only).
 //
-// Reads the sealed DefiLlama snapshot, scores every rankable pre-token
-// protocol with the model in lib/model.ts, and writes the ranked board,
-// the dashboard's data, the dashboard itself, the screenshots and the
-// dossier the judge reads.
+// Reads the sealed DefiLlama snapshot, fits the comps curve and scores every
+// rankable pre-token protocol with the model in lib/model.ts, then writes:
 //
-//   board.json    the ranked board: rank, implied value and farm plan per row
-//   data.js       the same board in compact form, for dashboard/app.js
-//   dashboard/    the static page (index.html, radar.css, radar.js)
+//   board.json    the ranked board: rank, implied value, interval and farm
+//                 plan per row
+//   data.js       the same board in compact form, plus the fit, the
+//                 out-of-sample tests and the traded comps, for dashboard/
+//   dashboard/    the static page (index.html, ledger.css, ledger.js)
 //   screenshots/  the board, a detail view and a filtered view, stored as
 //                 base64 text (*.png.b64) so the repository stays text-only;
 //                 main.ts decodes them back into real PNGs in /output
 //   dossier.json  buildDossier's summary of dashboard/ and screenshots/
 //
-// The run is fully deterministic: same snapshot in, same bytes out, every
-// time. No network, no clock, no randomness.
+// The run is fully deterministic: the same snapshot in, the same bytes out,
+// every time. No network, no clock, no unseeded randomness.
 //
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input ../input/snapshot.json
@@ -30,12 +30,12 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { boardIssue, buildRadar, parseSnapshot } from './lib/model.ts';
+import { boardIssue, buildRadar, dataScript, parseSnapshot } from './lib/model.ts';
 import { buildDossier } from './vendor/makefun-board.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
-/** The dossier's text cap in UTF-8 bytes, and the gate's screenshot caps. */
+/** The dossier's text cap in UTF-8 bytes, and the gate's screenshot and dashboard caps. */
 const TEXT_MAX_BYTES = 65_536;
 const SCREENSHOTS = { max: 4, max_bytes: 524_288 };
 const DASHBOARD = { max_files: 400, max_bytes: 4_194_304 };
@@ -43,7 +43,7 @@ const IMAGE_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/;
 
 /** Fail with a message on stderr and exit code 1. */
 function fail(message: string): never {
-  process.stderr.write(`launch radar: ${message}\n`);
+  process.stderr.write(`launch radar v2: ${message}\n`);
   process.exit(1);
 }
 
@@ -90,7 +90,7 @@ function copyFlat(from: string, to: string): string[] {
 
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
-writeFileSync(join(outDir, 'data.js'), `window.RADAR=${JSON.stringify(radar)};\n`);
+writeFileSync(join(outDir, 'data.js'), dataScript(radar));
 
 const dashFiles = copyFlat(join(here, 'dashboard'), join(outDir, 'dashboard'));
 if (!dashFiles.includes('index.html')) fail('dashboard/ holds no index.html');
@@ -143,8 +143,8 @@ writeFileSync(
 );
 
 process.stdout.write(
-  `launch radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ` +
-    `${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside)\n` +
-    `launch radar: wrote board.json, data.js, dashboard/ (${dashFiles.length} files), ` +
+  `launch radar v2: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ` +
+    `${board.length} rows scored (${radar.early_size} early, ${radar.comps_size} traded comps fitted)\n` +
+    `launch radar v2: wrote board.json, data.js, dashboard/ (${dashFiles.length} files), ` +
     `screenshots/ (${shots.length} images) and dossier.json into ${outDir}\n`,
 );

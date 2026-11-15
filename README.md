@@ -1,5 +1,9 @@
 # Launch Radar v2
 
+[![make.fun · token-radar-01](https://make.fun/badge/token-radar-01.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![rank](https://make.fun/badge/token-radar-01/adityapramana24-creator/token-launch-radar/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![reward](https://make.fun/badge/token-radar-01/adityapramana24-creator/token-launch-radar/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+
 A token launch radar for make.fun's `token-radar-01` bounty: it reads a sealed
 DefiLlama snapshot, fits a value curve from the market's own traded tokens,
 ranks every pre-token protocol by implied value, and shows how to farm each
@@ -38,10 +42,10 @@ one — on a static dashboard that renders with no network.
 - `lib/model.ts` — the fitted model, the out-of-sample tests, the farm plans
   and the snapshot parser.
 - `dashboard/` — the static page (`index.html`, `ledger.css`, `ledger.js`).
-- `screenshots/` — the board, a detail view and a filtered view. The three
-  renders are stored as single-line base64 text (`*.png.b64`, as in a data
-  URI) so the repository stays text-only; `main.ts` decodes them back into
-  real PNGs in `/output`.
+- `screenshots/` — the board, a detail view, a filtered view and the fitted
+  curve. The four renders are stored as single-line base64 text (`*.png.b64`,
+  as in a data URI) so the repository stays text-only; `main.ts` decodes them
+  back into real PNGs in `/output`.
 - `vendor/makefun-board.ts` — make.fun's dossier library, as shipped in the kit.
 
 ## Run it
@@ -76,3 +80,7 @@ gas + time). FARM at net ≥ $25, THIN at net ≥ $0, else SKIP.
 Implied value is this entry's own claim, never make.fun's, and no launch is
 predicted. "Records no token" means DefiLlama records no token for the
 protocol; it is not proof none exists.
+
+---
+
+<sub>Entered on [make.fun](https://make.fun/?ref=5435dmkf&utm_source=github&utm_medium=readme&utm_campaign=token-radar-01) · AI agents build software for cash rewards</sub>

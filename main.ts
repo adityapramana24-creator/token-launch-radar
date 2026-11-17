@@ -1,4 +1,4 @@
-// Launch Radar v2: a token-radar-01 entry (Node 22, standard library only).
+// Launch Radar v3: a token-radar-01 entry (Node 22, standard library only).
 //
 // Reads the sealed DefiLlama snapshot, fits the comps curve and scores every
 // rankable pre-token protocol with the model in lib/model.ts, then writes:
@@ -43,7 +43,7 @@ const IMAGE_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/;
 
 /** Fail with a message on stderr and exit code 1. */
 function fail(message: string): never {
-  process.stderr.write(`launch radar v2: ${message}\n`);
+  process.stderr.write(`launch radar v3.7: ${message}\n`);
   process.exit(1);
 }
 
@@ -143,8 +143,8 @@ writeFileSync(
 );
 
 process.stdout.write(
-  `launch radar v2: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ` +
+  `launch radar v3.7: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ` +
     `${board.length} rows scored (${radar.early_size} early, ${radar.comps_size} traded comps fitted)\n` +
-    `launch radar v2: wrote board.json, data.js, dashboard/ (${dashFiles.length} files), ` +
+    `launch radar v3.7: wrote board.json, data.js, dashboard/ (${dashFiles.length} files), ` +
     `screenshots/ (${shots.length} images) and dossier.json into ${outDir}\n`,
 );

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Launch Radar v3.7: pre-token protocols priced from the market</title>
+<title>Launch Radar v4</title>
 <link rel="stylesheet" href="ledger.css">
 </head>
 <body>
@@ -23,11 +23,10 @@
   <p class="acct-sub" id="acct-sub"></p>
   <p class="check" id="check">Re-running the model in your browser…</p>
   <div class="fstrip" id="fstrip"></div>
-  <p class="bestfarms" id="bestfarms"></p>
  </section>
 
  <section class="panel board-panel" id="board-section">
-  <div class="panel-head"><h2>The board</h2><p class="panel-sub">Click a row for its plan, a heading to sort. Ticket/share recompute every net and verdict.</p></div>
+  <div class="panel-head"><h2>The board</h2><p class="panel-sub">Click a row for its plan.</p></div>
   <div class="tabrow"><div class="tabs" id="tabs"></div><div class="chips" id="chips"></div></div>
   <div id="board-tab">
    <p class="oos-note" id="early-rule"></p>
@@ -42,13 +41,16 @@
    <div class="controls econ-controls">
     <div class="field seg-field"><span class="seg-label">Ticket</span><div class="seg" id="seg-ticket"></div></div>
     <div class="field seg-field"><span class="seg-label">Airdrop share</span><div class="seg" id="seg-share"></div></div>
-    <p class="econ-note">Net = slice − gas − time ($2.40/h) − yield forgone (net). ROBUST pays at the low end.</p>
+    <p class="econ-note">Net = slice − gas − time − yield forgone. ROBUST pays at the low end.</p>
    </div>
    <div class="bookrow"><p class="farmbook" id="farmbook"></p><p class="count" id="count"></p></div>
+   <div class="board-main">
    <div class="table-wrap"><table class="board" id="board">
     <thead><tr><th data-k="rank">#</th><th data-k="name">Protocol</th><th data-k="tvl">TVL</th><th data-k="growth">7d</th><th data-k="rank">Implied</th><th>P25–P75 band</th><th>Slice</th><th data-k="net">Net / low</th><th data-k="breakeven">Break-even</th><th data-k="nethour">$/hr</th><th>Verdict</th><th>Plan</th><th></th></tr></thead>
     <tbody id="board-body"></tbody>
    </table></div>
+   <aside class="side" id="side"></aside>
+   </div>
   </div>
   <div id="traded-tab" hidden>
    <p class="count" id="traded-note"></p>
@@ -71,28 +73,27 @@
  <section class="panel compare-panel" id="compare" hidden></section>
 
  <section class="panel method" id="method">
-  <div class="panel-head"><h2>Method and backtest</h2><p class="panel-sub">Computed from the snapshot.</p></div>
+  <div class="panel-head"><h2>Method and backtest</h2></div>
   <div class="method-grid" id="method-prose"></div>
   <div class="backtest-grid">
    <figure class="chart"><div id="loo-scatter"></div>
-    <figcaption>Each dot is one of the 88 comps: actual across, predicted up; dashed = perfect.</figcaption>
+    <figcaption>Each dot is one of the 88 comps: actual across, predicted up.</figcaption>
    </figure>
    <div>
     <h3>The fit, in full</h3>
     <div id="fit-box"></div>
     <table class="oos" id="oos-table"></table>
-    <p class="oos-note">All blind tests use the shipped model.</p>
    </div>
   </div>
   <h3>The ablation: every term earned its place</h3>
   <table class="oos" id="ablation-table"></table>
   <p class="oos-note" id="ablation-note"></p>
   <div id="method-prose2"></div>
-  <p class="caveat">What this radar does not do: predict whether or when any token launches. “Records no token” means DefiLlama records none. Implied value is this entry's claim, never make.fun's.</p>
+  <p class="caveat">This radar does not predict whether or when any token launches. Implied value is this entry's claim, never make.fun's.</p>
  </section>
 
  <footer class="foot">
-  <p>Launch Radar v3.7, for make.fun's token-radar-01. Snapshot: DefiLlama protocol index, frozen at the date above.</p>
+  <p>Launch Radar v4, for make.fun's token-radar-01.</p>
  </footer>
 </main>
 <script src="../data.js"></script>

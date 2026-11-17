@@ -1,4 +1,4 @@
-# Launch Radar v3.7
+# Launch Radar v4
 
 [![make.fun · token-radar-01](https://make.fun/badge/token-radar-01.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 [![rank](https://make.fun/badge/token-radar-01/adityapramana24-creator/token-launch-radar/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
@@ -21,6 +21,25 @@ model in the reader's browser.
   aside by the rule, with the per-reason counts on the cover
   (CEX 42 · Liquid Staking 38 · Bridge 28 · Canonical Bridge 15 ·
   versioned 11 · wrapped/staked 5 · Liquid Restaking 3 · Restaked BTC 2).
+  The board opens with the three best farms by net per hour (Monolith Market,
+  Manifest Trade, GoonFi — all ROBUST at the $5,000 default), shown as board
+  rows above rank 1 with their true ranks, so the reader sees what pays
+  before the ranking itself; the board below still ranks all 198 by implied
+  value.
+- **Puts the ablation on the cover**: below the formula, a three-line strip
+  shows the shipped model against size-only and flat baselines
+  (leave-one-out ×3.02 / ×3.27 / ×4.91, walk-forward ×2.10 / ×2.11 / ×4.49),
+  the rejected terms (chains breadth: best LOO ×2.93, walk-forward collapsed
+  to ×2.28; category offsets ×3.08), and the calibration (P25–P75 holds 50%,
+  P10–P90 holds 78%, time-split ×2.06, top-20 20/20) — every number taken
+  from the fitted model, so a reader who never scrolls still sees what was
+  tested, what was rejected, and how the bands hold up.
+- **Keeps a sidebar beside the board** (board and filtered views): how a row
+  is valued in three sentences, FARM NEXT — the next three farms by net per
+  hour after the cover's best three, computed live from the reader's ticket
+  and share — and a mini leave-one-out scatter, the same 88 comps as the
+  cover plot. The board section breaks out to full width so the sidebar costs
+  no vertical space: 18 ranked rows stay visible on the cover.
 - **Prices each row from a fitted curve, tested out of sample**: log(mcap/TVL)
   is regressed on log(TVL) across the 88 traded-token comps, with a growth
   tilt from the 7-day change and a small maturity tilt — no category term
@@ -56,17 +75,18 @@ model in the reader's browser.
   mechanism) at the chain's own rate from a stated per-chain table (Ethereum
   $3.00 an action, other chains $0.05–$1.00), plus a $0.75-per-extra-chain
   bridge reserve, and time at $2.40 an hour — plan hours run 2.4–5.2 hours
-  across 14 distinct displayed values (16 exact), so the cover shows five
-  different hour figures and eleven different plan costs in its first 14
-  rows. The slice arithmetic shows the plan's time context explicitly —
-  90/(age+90), the share of the protocol's life the plan would cover if the
-  token launched at plan end — as context only, never as a multiplier. The
-  snapshot carries no APY, so the plan nets at the conservative end (own
-  yield 0%, the full 4% T-bill forgone) and the detail shows the forgone
-  range. At the $5,000 default ticket the book reads 31 ROBUST · 99 FARM ·
-  23 THIN · 45 SKIP, net $17,543 over 925.3 hours. Ticket ($500–$10K) and
-  airdrop share (5–20%) controls recompute every slice, net and verdict; the
-  board shows slice, net, break-even launch value and net per hour.
+  across 14 distinct displayed values (16 exact), so the cover shows six
+  different hour figures and ten different plan costs in its first 14 plan
+  rows (three best farms plus ranks 1–11). The slice arithmetic shows the
+  plan's time context explicitly — the share of the protocol's life the plan
+  would cover if the token launched at plan end — as context only, never as
+  a multiplier. The snapshot carries no APY, so the plan nets at the
+  conservative end (own yield 0%, the full 4% T-bill forgone) and the detail
+  shows the forgone range. At the $5,000 default ticket the book reads 31
+  ROBUST · 99 FARM · 23 THIN · 45 SKIP, net $17,543 over 925.3 hours. Ticket
+  ($500–$10K) and airdrop share (5–20%) controls recompute every slice, net
+  and verdict; the board shows slice, net, break-even launch value and net
+  per hour.
 - **Separates live from pre-token**: traded tokens sit in their own tab with
   their market caps shown, never mixed into the ranking, and traded reference
   anchors appear inline on the board (after ranks 5 and 50). The cover scatter shows all 88 comps'
@@ -83,13 +103,14 @@ model in the reader's browser.
 - `lib/model.ts` — the fitted model, the out-of-sample tests, the ablation,
   the bootstrap rank ranges, the bands, the farm plans and the snapshot parser.
 - `dashboard/` — the static page (`index.html`, `ledger.css`, `ledger.js`,
-  `model.js`). Source is 64,997 bytes, inside the 65,536-byte dossier text
-  cap (dossier text 65,352 bytes; dossier.json 634,913 bytes, inside the
+  `model.js`). Source is 65,114 bytes, inside the 65,536-byte dossier text
+  cap (dossier text 65,469 bytes; dossier.json 706,839 bytes, inside the
   1,572,864-byte cap).
-- `screenshots/` — the board, a detail view, a filtered view (18 rows,
-  Onchain Capital Allocator) with one row expanded inline, the farm book and
-  a side-by-side compare, and Method + backtest. The four renders are stored
-  as single-line base64 text (`*.png.b64`, as in a data URI) so the
+- `screenshots/` — the board (with the sidebar beside it), a detail view, a
+  filtered view (14 rows, verdict FARM in Risk Curators, sorted by net per
+  hour) with one row expanded inline (full 8-step grid open), the farm book
+  and a side-by-side compare, and Method + backtest. The four renders are
+  stored as single-line base64 text (`*.png.b64`, as in a data URI) so the
   repository stays text-only; `main.ts` decodes them back into real PNGs in
   `/output`.
 - `vendor/makefun-board.ts` — make.fun's dossier library, as shipped in the kit.

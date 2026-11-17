@@ -1,4 +1,4 @@
-// Launch Radar v3.8 — entry point for the token-radar-01 bounty.
+// Launch Radar v4 — entry point for the token-radar-01 bounty.
 // Node 22, standard library only. No network, no clock, no unseeded
 // randomness: the same sealed snapshot always produces the same bytes.
 //
@@ -28,7 +28,7 @@ import { buildRadar, boardIssue, dataScript, parseSnapshot } from './lib/model.t
 import { buildDossier as makeDossier } from './vendor/makefun-board.ts';
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
-const LABEL = 'launch radar v3.8';
+const LABEL = 'launch radar v4';
 
 /** Caps from the gate: dossier text, screenshots, dashboard. */
 const DOSSIER_TEXT_CAP = 65_536;

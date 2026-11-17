@@ -1,4 +1,3 @@
-// Launch Radar v3.7 dashboard: window.RADAR, no network, no clock.
 (function () {
  'use strict';
  var DATA = window.RADAR, MODEL = window.RADAR_MODEL;
@@ -70,24 +69,25 @@
   }, 50);
  }
  function renderStats() {
-  var loo = DATA.loo, wf = DATA.walk_forward, ts = DATA.oos[1], v = DATA.verdict_counts;
+  var ab = DATA.ablation, v = DATA.verdict_counts, bc = DATA.band_coverage;
   var tx = function (t) { return times(Math.exp(t.model_median_log_err)); };
-  var fx = function (t) { return times(Math.exp(t.flat_median_log_err)); };
   var t1k = DATA.verdict_by_ticket.filter(function (t) { return t.ticket === 1000; })[0];
   var pay = v.ROBUST + v.FARM + v.THIN, pay1k = t1k.ROBUST + t1k.FARM + t1k.THIN;
+  var sub = document.querySelector('.f-sub');
+  sub.className = 'f-sub f-abl';
+  sub.innerHTML = '<b>Ablation</b> (LOO / walk-forward): shipped ' + times(ab[3].loo_x) + ' / ' + times(ab[3].wf_x) +
+   ' · size-only ' + times(ab[1].loo_x) + ' / ' + times(ab[1].wf_x) +
+   ' · flat ' + times(ab[0].loo_x) + ' / ' + times(ab[0].wf_x) + '<br>' +
+   '<b>Rejected:</b> chains breadth ' + times(ab[7].loo_x) + ' LOO but ' + times(ab[7].wf_x) + ' walk-forward · category offsets ' + times(ab[5].loo_x) + ' — did not earn a place<br>' +
+   '<b>Calibration:</b> P25–P75 holds ' + Math.round(bc.p25_75 * 100) + '% · P10–P90 holds ' + Math.round(bc.p10_90 * 100) + '% · time-split ' + tx(DATA.oos[1]) + ' · top-20 ' + DATA.top20_stable + '/20';
   var el = document.createElement('p');
   el.className = 'f-stats';
-  el.innerHTML = '<b>Blind tests</b> — LOO ' + tx(loo) + ' (flat ' + fx(loo) + ') · ' +
-   'WF ' + tx(wf) + ' (flat ' + fx(wf) + ') · ' +
-   'time-split ' + tx(ts) + ' · ' +
-   'top-20 ' + DATA.top20_stable + '/20 · ' +
-   v.ROBUST + ' ROBUST · ' + v.FARM + ' FARM · ' + v.THIN + ' THIN · ' + v.SKIP + ' SKIP · ' +
+  el.innerHTML = v.ROBUST + ' ROBUST · ' + v.FARM + ' FARM · ' + v.THIN + ' THIN · ' + v.SKIP + ' SKIP · ' +
    pay + ' of ' + rows.length + ' plans pay · at $1K: ' + pay1k + ' pay · ' +
    DATA.off_tvl_order + ' rows 5+ off TVL order';
   document.querySelector('.f-main').appendChild(el);
  }
  function renderFormula() { $('fstrip').innerHTML = DATA.cover_fstrip_html; }
- function renderBestFarms() { $('bestfarms').innerHTML = DATA.best_farms_html; }
 
  function renderTabs() {
   var a = DATA.accounting;
@@ -117,7 +117,7 @@
  }
  function renderTraded() {
   var a = DATA.accounting;
-  $('traded-note').textContent = a.token_record + ' protocols record a token: ' + a.traded_positive + ' trade, ' + a.token_mcap_null + ' carry no market cap and ' + a.token_mcap_nonpositive + ' sit at zero or below. ' + a.comps_excluded + ' fail the watchlist test and ' + a.comps_excluded_bridge + ' more are bridges, leaving the ' + DATA.comps_size + ' comps the curve is fitted on.';
+  $('traded-note').textContent = a.token_record + ' protocols record a token: ' + a.traded_positive + ' trade, ' + a.token_mcap_null + ' carry no market cap, ' + a.token_mcap_nonpositive + ' at zero or below. ' + a.comps_excluded + ' fail the watchlist test and ' + a.comps_excluded_bridge + ' are bridges, leaving ' + DATA.comps_size + ' comps for the curve.';
   $('traded-body').innerHTML = DATA.traded.map(function (t) {
    return protoCells(t) +
     N + (t.mcap_usd == null ? '<span class="null">null</span>' : money(t.mcap_usd)) + '</td>' +
@@ -125,8 +125,8 @@
   }).join('');
  }
  function renderSetAside() {
-  $('setaside-note').textContent = DATA.accounting.set_aside + ' pre-token protocols are set aside by the watchlist rule itself. By reason: ' +
-   DATA.set_aside_reasons.map(function (x) { return x.reason + ' ' + x.n; }).join(' · ') + '. Each row below names its reason.';
+  $('setaside-note').textContent = DATA.accounting.set_aside + ' pre-token protocols are set aside by the rule. By reason: ' +
+   DATA.set_aside_reasons.map(function (x) { return x.reason + ' ' + x.n; }).join(' · ') + '.';
   $('setaside-body').innerHTML = DATA.set_aside.map(function (t) {
    return protoCells(t) + '<td>' + esc(t.reason) + '</td></tr>';
   }).join('');
@@ -164,11 +164,9 @@
   $('chips').innerHTML = defs.map(function (d) {
    return '<button data-list="' + d[0] + '" class="' + (state.list === d[0] ? 'on' : '') + '">' + d[1] + ' <span>' + d[2] + '</span></button>';
   }).join('');
-  $('early-rule').textContent = 'Early finds: pre-token, passes the watchlist’s test, not on the watchlist. Of the ' + n.early + ': ' + n.fresh + ' listed ≤180 days ago · ' + n.rising + ' up ≥10% in 7 days.';
+  $('early-rule').textContent = 'Early finds: pass the watchlist test, not on the watchlist. Of the ' + n.early + ': ' + n.fresh + ' listed ≤180 days ago · ' + n.rising + ' up ≥10% in 7 days.';
  }
  function splitStep(s) { var d = s.indexOf(' — '); return d > 0 ? [s.slice(0, d), s.slice(d + 3)] : ['', s]; }
- /* The inline plan under an expanded board row: a compact strip of the
-  three key steps, with all eight one click away. */
  function expandHtml(r) {
   var sp = MODEL.stepPlan(r);
   var cells = r.farm_steps.map(function (s, i) {
@@ -181,35 +179,54 @@
    '<div class="plan-steps">' + cells + '</div>' +
    '<p class="oos-note"><button class="cmp-btn" data-detail="' + esc(r.slug) + '">Full detail →</button></p></details></td></tr>';
  }
+ function rowHtml(r, farm, sel, open, cmpOn) {
+  var e = econFor(r);
+  var chg = r.change_7d == null ? '—' : signed(r.change_7d, pct(r.change_7d));
+  return '<tr data-' + (farm ? 'farm' : 'slug') + '="' + esc(r.slug) + '" class="' + (farm ? 'farm-row' : (sel ? 'selected' : '')) + '">' +
+   N + '<strong>' + r.rank + '</strong> <span class="range">' + r.rank_lo + '–' + r.rank_hi + '</span></td>' +
+   '<td>' + (farm ? '<a href="?detail=' + esc(r.slug) + '">' : '') + NM + esc(r.name) + '</span>' + (farm ? '</a>' : '') + (r.watchlist ? '<span class="wl">Watchlist</span>' : '') + '</td>' +
+   N + money(r.tvl_usd) + '</td>' + N + chg + '</td>' +
+   N + '<strong>' + money(r.implied_value_usd) + '</strong></td>' +
+   N + money(r.p25_usd) + '–' + money(r.p75_usd) + '</td>' +
+   N + moneySigned(e.gross) + '</td>' +
+   N + signed(e.net, moneySigned(e.net)) + ' / ' + signed(e.netLow, moneySigned(e.netLow)) + '</td>' +
+   N + money(e.breakEven) + '</td>' +
+   N + signed(e.netPerHour, moneySigned(e.netPerHour)) + '</td>' +
+   '<td>' + chip(e.verdict) + '</td>' +
+   '<td class="plan">' + (farm ? '' : (open ? '▾ ' : '▸ ')) + esc(r.plan_action) + ' · ' + esc(r.chains[0] || '—') + ' · ' + gasMoney(r.plan_fees_usd) + ' · ' + MODEL.planHours(r).toFixed(1) + ' h · ' + FA.horizon_days + ' d</td>' +
+   (farm ? '<td></td>' : '<td><button class="cmp-btn' + (cmpOn ? ' on' : '') + '" data-cmp="' + esc(r.slug) + '">' + (cmpOn ? '✓ Comparing' : '⇄ Compare') + '</button></td>') + '</tr>';
+ }
+ function topByHour() { return rows.slice().sort(function (a, b) { return econFor(b).netPerHour - econFor(a).netPerHour; }); }
+ function renderSide() {
+  var next = topByHour().slice(3, 6).map(function (r) {
+   var e = econFor(r);
+   return '<div class="sn"><b>#' + r.rank + ' ' + esc(r.name) + '</b><br>' + moneySigned(e.netPerHour) + '/h · net ' + moneySigned(e.net) + ' ' + chip(e.verdict) + '</div>';
+  }).join('');
+  $('side').innerHTML = '<h3>How a row is valued</h3>' +
+   '<p>Implied = TVL × curve × growth × maturity. Slice = your share of implied. Net = slice − gas − time − yield forgone.</p>' +
+   '<h3>FARM NEXT</h3>' + next +
+   '<h3>LOO scatter</h3>' + document.querySelector('.f-scatter').innerHTML;
+ }
  function renderBoard() {
   var list = filteredRows();
   var counts = { ROBUST: 0, FARM: 0, THIN: 0, SKIP: 0 };
   list.forEach(function (r) { counts[econFor(r).verdict]++; });
-  $('count').textContent = list.length + ' of ' + rows.length + ' shown · ' +
-   counts.ROBUST + ' ROBUST · ' + counts.FARM + ' FARM · ' + counts.THIN + ' THIN · ' + counts.SKIP + ' SKIP';
+  var shown = ['ROBUST', 'FARM', 'THIN', 'SKIP'].filter(function (v) { return counts[v]; }).map(function (v) { return counts[v] + ' ' + v; });
+  $('count').textContent = list.length + ' of ' + rows.length + ' shown' + (shown.length ? ' · ' + shown.join(' · ') : '');
   var anchors = {};
   if (list.length === rows.length && state.sort === 'rank') {
    DATA.anchors.forEach(function (a) { anchors[a.after_rank] = a.text; });
   }
   var html = '';
+  if (list.length === rows.length && state.sort === 'rank') {
+   var best = topByHour().slice(0, 3);
+   html += '<tr class="anchor"><td colspan="13">Best farms — top 3 by net per hour (the board below ranks all ' + rows.length + ' by implied value)</td></tr>';
+   best.forEach(function (r) { html += rowHtml(r, true); });
+  }
   list.forEach(function (r) {
-   var e = econFor(r);
-   var chg = r.change_7d == null ? '—' : signed(r.change_7d, pct(r.change_7d));
    var cmpOn = state.compare.indexOf(r.slug) >= 0;
    var open = state.expanded === r.slug;
-   html += '<tr data-slug="' + esc(r.slug) + '" class="' + (state.detail === r.slug || open ? 'selected' : '') + '">' +
-    N + '<strong>' + r.rank + '</strong> <span class="range">' + r.rank_lo + '–' + r.rank_hi + '</span></td>' +
-    '<td>' + NM + esc(r.name) + '</span>' + (r.watchlist ? '<span class="wl">Watchlist</span>' : '') + '</td>' +
-    N + money(r.tvl_usd) + '</td>' + N + chg + '</td>' +
-    N + '<strong>' + money(r.implied_value_usd) + '</strong></td>' +
-    N + money(r.p25_usd) + '–' + money(r.p75_usd) + '</td>' +
-    N + moneySigned(e.gross) + '</td>' +
-    N + signed(e.net, moneySigned(e.net)) + ' / ' + signed(e.netLow, moneySigned(e.netLow)) + '</td>' +
-    N + money(e.breakEven) + '</td>' +
-    N + signed(e.netPerHour, moneySigned(e.netPerHour)) + '</td>' +
-    '<td>' + chip(e.verdict) + '</td>' +
-    '<td class="plan">' + (open ? '▾ ' : '▸ ') + esc(r.plan_action) + ' · ' + esc(r.chains[0] || '—') + ' · ' + gasMoney(r.plan_fees_usd) + ' · ' + MODEL.planHours(r).toFixed(1) + ' h · ' + FA.horizon_days + ' d</td>' +
-    '<td><button class="cmp-btn' + (cmpOn ? ' on' : '') + '" data-cmp="' + esc(r.slug) + '">' + (cmpOn ? '✓ Comparing' : '⇄ Compare') + '</button></td></tr>';
+   html += rowHtml(r, false, state.detail === r.slug || open, open, cmpOn);
    if (open) html += expandHtml(r);
    if (anchors[r.rank]) html += '<tr class="anchor"><td colspan="13">' + esc(anchors[r.rank]) + '</td></tr>';
   });
@@ -233,6 +250,7 @@
    th.classList.toggle('sorted', on);
    th.classList.toggle('desc', on && ['tvl', 'growth', 'net', 'nethour'].indexOf(state.sort) >= 0);
   });
+  renderSide();
   if (list.length === 0) { $('farmbook').textContent = 'No protocols in this selection.'; return; }
   var fees = 0, slices = 0, net = 0, hrs = 0;
   list.forEach(function (r) { var e = econFor(r); fees += e.cost; slices += e.gross; net += e.net; hrs += MODEL.planHours(r); });
@@ -292,7 +310,7 @@
    '<div class="ci-inner" style="left:' + at(r.p25_usd).toFixed(1) + '%;right:' + (100 - at(r.p75_usd)).toFixed(1) + '%"></div>' +
    '<div class="ci-point" style="left:' + at(r.implied_value_usd).toFixed(1) + '%"></div></div>' +
    '<div class="ci-labels"><span>P10 ' + money(r.p10_usd) + '</span><span>P25–P75 ' + money(r.p25_usd) + '–' + money(r.p75_usd) + '</span><span>P90 ' + money(r.p90_usd) + '</span></div></div>' +
-   '<p class="oos-note">Bands from leave-one-out misses near this TVL.</p>';
+   '<p class="oos-note">Bands from LOO misses.</p>';
  }
  function compsHtml(r) {
   var near = MODEL.nearestComps(r, DATA.comps, FIT, 4);
@@ -344,7 +362,7 @@
    return '<tr><td>$' + (t >= 1000 ? (t / 1000) + ',000' : t) + '</td>' + cells + '</tr>';
   }).join('');
   var share = r.age_days == null ? null : 90 / (r.age_days + 90);
-  var timeCtx = share == null ? 'its listing date is unknown, so the plan carries no time context' : 'it has run ' + r.age_days + ' days, so the plan covers 90/(' + r.age_days + '+90) = ' + Math.round(share * 100) + '% of its life if the token launched at plan end';
+  var timeCtx = share == null ? 'its listing date is unknown, so the plan carries no time context' : 'it has run ' + r.age_days + ' days, so the plan covers ' + Math.round(share * 100) + '% of its life at plan end';
   var sliceLine = 'Slice = ' + Math.round(state.share * 100) + '% × ' + money(r.implied_value_usd) + ' × $' + state.ticket.toLocaleString('en-US') + ' / ' + money(r.tvl_usd) + ' TVL = ' + moneySigned(e.gross) + ' — ' + timeCtx + '.';
   var dropLine = 'If the launch value drops: ' + [5, 10, 20].map(function (d) {
    var g = MODEL.farmEconomics(r, r.implied_value_usd * (1 - d / 100), r.p25_usd * (1 - d / 100), state.ticket, state.share);
@@ -360,7 +378,7 @@
   ]);
   var econ = kvRows([
    ['Expected slice', 'implied × ' + Math.round(state.share * 100) + '% × ticket ÷ TVL', moneySigned(e.gross)],
-   ...(share == null ? [] : [['Slice × time share ' + Math.round(share * 100) + '%', 'as context only — verdict uses the full slice', moneySigned(e.gross * share)]]),
+   ...(share == null ? [] : [['Slice × time share ' + Math.round(share * 100) + '%', 'context only', moneySigned(e.gross * share)]]),
    ['Gas + time', 'gas ' + gasMoney(MODEL.planGas(r)) + ' + ' + MODEL.planHours(r).toFixed(1) + ' h at $2.40/h', moneySigned(-(e.cost - e.forgone))],
    ['Yield forgone, net', 'T-bill 4% − own yield (0% assumed)', '−$' + Math.round(e.forgone) + ' … $0'],
    ['Net expected value', 'at own yield 0%', moneySigned(e.net), true],
@@ -427,7 +445,7 @@
      ['Verdict', '', chip(e.verdict)],
     ]) + '</div>';
   }).join('');
-  el.innerHTML = '<div class="panel-head"><h2>Compare</h2><p class="panel-sub">Two protocols, side by side.</p></div><div class="compare-grid">' + cols + '</div>';
+  el.innerHTML = '<div class="panel-head"><h2>Compare</h2><p class="panel-sub">Side by side.</p></div><div class="compare-grid">' + cols + '</div>';
   el.hidden = false;
  }
 
@@ -536,7 +554,6 @@
  renderAcct();
  renderFormula();
  renderStats();
- renderBestFarms();
  renderTabs();
  renderChips();
  fillFilters();

@@ -20,17 +20,19 @@
   for (i = 0; i < 3; i++) if (Math.abs(v) >= u[i][0]) return '$' + (v / u[i][0]).toFixed(u[i][2]) + u[i][1];
   return '$' + Math.round(v);
  }
- function moneyFull(v) { return '$' + Math.round(v).toLocaleString('en-US'); }
+ function moneyFull(v) { return '$' + lc(Math.round(v)); }
+ function lc(v) { return v.toLocaleString('en-US'); }
  function moneySigned(v) { return (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
  function gasMoney(v) { return '$' + v.toFixed(2); }
  function pct(v) { return v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '%'; }
+ function pc(v) { return (v * 100).toFixed(1) + '%'; }
  function times(x) { return '×' + x.toFixed(2); }
  function factor(x) { return '×' + x.toFixed(3); }
  function chip(v) { return '<span class="chip ' + v + '">' + v + '</span>'; }
  function signed(v, text) { return '<span class="' + (v > 0 ? 'up' : v < 0 ? 'down' : '') + '">' + text + '</span>'; }
  function ageText(d) {
   if (d == null) return 'listing date unknown';
-  return 'listed ' + (d < 2 ? 'a day' : d < 30 ? d + ' days' : d < 60 ? 'about a month' : d < 365 ? Math.floor(d / 30) + ' months' : (d / 365).toFixed(1) + ' years') + ' ago';
+  return 'listed ' + (d < 2 ? 'a day' : d < 30 ? d + ' days' : d < 60 ? 'a month' : d < 365 ? Math.floor(d / 30) + ' months' : (d / 365).toFixed(1) + ' years') + ' ago';
  }
  function kvRows(pairs) {
   return '<table class="derive"><tbody>' + pairs.map(function (p) {
@@ -42,14 +44,13 @@
   if (!econCache[k]) econCache[k] = MODEL.farmEconomics(r, r.implied_value_usd, r.p25_usd, state.ticket, state.share);
   return econCache[k];
  }
-
  function renderAcct() {
   var a = DATA.accounting;
   var cells = [
    [a.ranked + ' ranked', DATA.watchlist_size + ' watchlist + ' + DATA.early_size + ' early'],
    [a.token_record + ' record a token', a.traded_positive + ' trade · ' + a.token_no_mcap + ' carry no market cap'],
-   [a.set_aside + ' set aside by rule', 'by the watchlist\u2019s own rule'],
-   [a.total + ' protocols', 'all protocols, accounted for'],
+   [a.set_aside + ' set aside by rule', 'by the watchlist rule'],
+   [a.total + ' protocols', 'all accounted for'],
   ];
   $('acct').innerHTML = cells.map(function (c, i) {
    return (i ? '<div class="eq">' + (i === 3 ? '=' : '+') + '</div>' : '') + '<div><b>' + c[0] + '</b><span>' + c[1] + '</span></div>';
@@ -61,34 +62,32 @@
    var v = MODEL.verify(DATA), el = $('check');
    if (v.ok) {
     el.className = 'check ok';
-    el.textContent = '✓ page = board.json: ' + v.n + '/' + v.n + ' ranks, values, bands, ranges, verdicts and steps — re-run here in ' + v.seconds.toFixed(1) + ' s (LOO ' + times(v.looX) + ', walk-forward ' + times(v.wfX) + ') · Σ ' + money(v.agg) + ' = board.json · seal ' + v.digest + ' · values never rise down the board · ' + document.querySelectorAll('#board-body tr[data-slug]').length + ' rows drawn = ' + v.n + ' written';
+    el.textContent = '✓ page = board.json: ' + v.n + '/' + v.n + ' ranks, values, bands, ranges, verdicts and steps — re-run in ' + v.seconds.toFixed(1) + ' s (LOO ' + times(v.looX) + ', walk-forward ' + times(v.wfX) + ') · odds Brier ✓ · Σ ' + money(v.agg) + ' = board.json · seal ' + v.digest + ' · ranks 1 to ' + v.n + ' in order · values never rise down the board · ' + document.querySelectorAll('#board-body tr[data-slug]').length + ' rows drawn = ' + v.n + ' written';
    } else {
     el.className = 'check bad';
-    el.textContent = '✕ re-run mismatch: values ' + v.values + ', verdicts ' + v.verdicts + ', bands ' + v.bands + ', ranges ' + v.ranges + ', steps ' + v.steps + ' of ' + v.n + ', seal ' + (v.digestOk ? 'ok' : 'MISMATCH') + ', Σ ' + (v.aggOk ? 'ok' : 'MISMATCH');
+    el.textContent = '✕ re-run mismatch: values ' + v.values + ', verdicts ' + v.verdicts + ', bands ' + v.bands + ', ranges ' + v.ranges + ', steps ' + v.steps + ' of ' + v.n + ', seal ' + (v.digestOk ? 'ok' : 'MISMATCH') + ', Σ ' + (v.aggOk ? 'ok' : 'MISMATCH') + ', odds Brier ' + (v.oddsOk ? 'ok' : 'MISMATCH');
    }
   }, 50);
  }
  function renderStats() {
   var ab = DATA.ablation, v = DATA.verdict_counts, bc = DATA.band_coverage;
-  var tx = function (t) { return times(Math.exp(t.model_median_log_err)); };
   var t1k = DATA.verdict_by_ticket.filter(function (t) { return t.ticket === 1000; })[0];
   var pay = v.ROBUST + v.FARM + v.THIN, pay1k = t1k.ROBUST + t1k.FARM + t1k.THIN;
   var sub = document.querySelector('.f-sub');
   sub.className = 'f-sub f-abl';
-  sub.innerHTML = '<b>Ablation</b> (LOO / walk-forward): shipped ' + times(ab[3].loo_x) + ' / ' + times(ab[3].wf_x) +
+  sub.innerHTML = '<b>Ablation</b> (LOO / WF): shipped ' + times(ab[3].loo_x) + ' / ' + times(ab[3].wf_x) +
    ' · size-only ' + times(ab[1].loo_x) + ' / ' + times(ab[1].wf_x) +
    ' · flat ' + times(ab[0].loo_x) + ' / ' + times(ab[0].wf_x) + '<br>' +
-   '<b>Rejected:</b> chains breadth ' + times(ab[7].loo_x) + ' LOO but ' + times(ab[7].wf_x) + ' walk-forward · category offsets ' + times(ab[5].loo_x) + ' — did not earn a place<br>' +
-   '<b>Calibration:</b> P25–P75 holds ' + Math.round(bc.p25_75 * 100) + '% · P10–P90 holds ' + Math.round(bc.p10_90 * 100) + '% · time-split ' + tx(DATA.oos[1]) + ' · top-20 ' + DATA.top20_stable + '/20';
+   '<b>Rejected:</b> chains ' + times(ab[7].loo_x) + ' / ' + times(ab[7].wf_x) + ' · category ' + times(ab[5].loo_x) + ' — not kept · <b>Calib:</b> P25–P75 ' + Math.round(bc.p25_75 * 100) + '% · P10–P90 ' + Math.round(bc.p10_90 * 100) + '% · time-split ' + times(Math.exp(DATA.oos[1].model_median_log_err)) + ' · top-20 ' + DATA.top20_stable + '/20<br>' +
+   DATA.odds_card_html;
   var el = document.createElement('p');
   el.className = 'f-stats';
   el.innerHTML = v.ROBUST + ' ROBUST · ' + v.FARM + ' FARM · ' + v.THIN + ' THIN · ' + v.SKIP + ' SKIP · ' +
-   pay + ' of ' + rows.length + ' plans pay · at $1K: ' + pay1k + ' pay · ' +
-   DATA.off_tvl_order + ' rows 5+ off TVL order';
+   pay + ' of ' + rows.length + ' pay · at $1K: ' + pay1k + ' pay · ' +
+   DATA.off_tvl_order + ' rows 5+ off TVL order (' + Math.round(DATA.off_tvl_order / rows.length * 100) + '%)';
   document.querySelector('.f-main').appendChild(el);
  }
  function renderFormula() { $('fstrip').innerHTML = DATA.cover_fstrip_html; }
-
  function renderTabs() {
   var a = DATA.accounting;
   var tabs = [
@@ -117,7 +116,7 @@
  }
  function renderTraded() {
   var a = DATA.accounting;
-  $('traded-note').textContent = a.token_record + ' protocols record a token: ' + a.traded_positive + ' trade, ' + a.token_mcap_null + ' carry no market cap, ' + a.token_mcap_nonpositive + ' at zero or below. ' + a.comps_excluded + ' fail the watchlist test and ' + a.comps_excluded_bridge + ' are bridges, leaving ' + DATA.comps_size + ' comps for the curve.';
+  $('traded-note').textContent = a.token_record + ' protocols record a token: ' + a.traded_positive + ' trade, ' + a.token_mcap_null + ' no market cap, ' + a.token_mcap_nonpositive + ' at ≤ zero. ' + a.comps_excluded + ' fail the test and ' + a.comps_excluded_bridge + ' are bridges, leaving ' + DATA.comps_size + ' comps.';
   $('traded-body').innerHTML = DATA.traded.map(function (t) {
    return protoCells(t) +
     N + (t.mcap_usd == null ? '<span class="null">null</span>' : money(t.mcap_usd)) + '</td>' +
@@ -131,7 +130,6 @@
    return protoCells(t) + '<td>' + esc(t.reason) + '</td></tr>';
   }).join('');
  }
-
  function filteredRows() {
   var q = state.q.trim().toLowerCase();
   var out = rows.filter(function (r) {
@@ -158,13 +156,13 @@
   return out.sort(function (a, b) { return key(a) - key(b); });
  }
  function renderChips() {
-  var n = { watch: 0, early: 0, gainers: 0, fresh: 0, rising: 0 };
-  rows.forEach(function (r) { if (r.watchlist) n.watch++; else { n.early++; if (r.age_days != null && r.age_days <= 180) n.fresh++; if (r.change_7d != null && r.change_7d >= 10) n.rising++; } if (r.change_7d > 0) n.gainers++; });
+  var n = { watch: 0, early: 0, gainers: 0, fresh: 0, rising: 0, off: 0 };
+  rows.forEach(function (r) { if (r.watchlist) n.watch++; else { n.early++; if (r.age_days != null && r.age_days <= 180) n.fresh++; if (r.change_7d != null && r.change_7d >= 10) n.rising++; if (r.tvl_usd >= DATA.floor_usd) n.off++; } if (r.change_7d > 0) n.gainers++; });
   var defs = [['', 'All', rows.length], ['watch', 'Watchlist', n.watch], ['early', 'Early finds', n.early], ['gainers', '7-day gainers', n.gainers]];
   $('chips').innerHTML = defs.map(function (d) {
    return '<button data-list="' + d[0] + '" class="' + (state.list === d[0] ? 'on' : '') + '">' + d[1] + ' <span>' + d[2] + '</span></button>';
   }).join('');
-  $('early-rule').textContent = 'Early finds: pass the watchlist test, not on the watchlist. Of the ' + n.early + ': ' + n.fresh + ' listed ≤180 days ago · ' + n.rising + ' up ≥10% in 7 days.';
+  $('early-rule').textContent = 'Early finds: pass the watchlist test, off the watchlist. Of the ' + n.early + ': ' + n.fresh + ' listed ≤180 days ago · ' + n.rising + ' up ≥10% in 7 days · ' + n.off + ' off-list.';
  }
  function splitStep(s) { var d = s.indexOf(' — '); return d > 0 ? [s.slice(0, d), s.slice(d + 3)] : ['', s]; }
  function expandHtml(r) {
@@ -174,7 +172,7 @@
    return '<div><b>' + esc(w[0]) + ' · ' + gasMoney(sp[i].cost) + ' · ' + sp[i].mins + ' min</b> — ' + esc(w[1]) + '</div>';
   }).join('');
   var keys = [1, 4, 5].map(function (i) { var w = splitStep(r.farm_steps[i]); return '<b>' + esc(w[0]) + '</b> ' + esc(w[1].split(' ').slice(0, 6).join(' ')) + '… · ' + gasMoney(sp[i].cost) + ' · ' + sp[i].mins + ' min'; }).join(' · ');
-  return '<tr class="expand"><td colspan="13"><details class="plan-det"><summary class="plan-strip">' + keys +
+  return '<tr class="expand"><td colspan="15"><details class="plan-det"><summary class="plan-strip">' + keys +
    ' — <b>8 steps · ' + gasMoney(MODEL.planGas(r)) + ' · ' + MODEL.planHours(r).toFixed(1) + ' h</b></summary>' +
    '<div class="plan-steps">' + cells + '</div>' +
    '<p class="oos-note"><button class="cmp-btn" data-detail="' + esc(r.slug) + '">Full detail →</button></p></details></td></tr>';
@@ -186,6 +184,8 @@
    N + '<strong>' + r.rank + '</strong> <span class="range">' + r.rank_lo + '–' + r.rank_hi + '</span></td>' +
    '<td>' + (farm ? '<a href="?detail=' + esc(r.slug) + '">' : '') + NM + esc(r.name) + '</span>' + (farm ? '</a>' : '') + (r.watchlist ? '<span class="wl">Watchlist</span>' : '') + '</td>' +
    N + money(r.tvl_usd) + '</td>' + N + chg + '</td>' +
+   N + money(r.if_launches_usd) + '</td>' +
+   '<td class="num"><span class="oddb"><span style="width:' + Math.round(r.ever * 100) + '%"></span></span> ' + Math.round(r.ever * 100) + '%</td>' +
    N + '<strong>' + money(r.implied_value_usd) + '</strong></td>' +
    N + money(r.p25_usd) + '–' + money(r.p75_usd) + '</td>' +
    N + moneySigned(e.gross) + '</td>' +
@@ -193,19 +193,22 @@
    N + money(e.breakEven) + '</td>' +
    N + signed(e.netPerHour, moneySigned(e.netPerHour)) + '</td>' +
    '<td>' + chip(e.verdict) + '</td>' +
-   '<td class="plan">' + (farm ? '' : (open ? '▾ ' : '▸ ')) + esc(r.plan_action) + ' · ' + esc(r.chains[0] || '—') + ' · ' + gasMoney(r.plan_fees_usd) + ' · ' + MODEL.planHours(r).toFixed(1) + ' h · ' + FA.horizon_days + ' d</td>' +
+   '<td class="plan" title="' + esc(r.chains.join(', ') || '—') + '">' + (farm ? '' : (open ? '▾ ' : '▸ ')) + esc(r.plan_action) + ' · ' + gasMoney(r.plan_fees_usd) + ' · ' + MODEL.planHours(r).toFixed(1) + ' h</td>' +
    (farm ? '<td></td>' : '<td><button class="cmp-btn' + (cmpOn ? ' on' : '') + '" data-cmp="' + esc(r.slug) + '">' + (cmpOn ? '✓ Comparing' : '⇄ Compare') + '</button></td>') + '</tr>';
  }
  function topByHour() { return rows.slice().sort(function (a, b) { return econFor(b).netPerHour - econFor(a).netPerHour; }); }
  function renderSide() {
   var next = topByHour().slice(3, 6).map(function (r) {
    var e = econFor(r);
-   return '<div class="sn"><b>#' + r.rank + ' ' + esc(r.name) + '</b><br>' + moneySigned(e.netPerHour) + '/h · net ' + moneySigned(e.net) + ' ' + chip(e.verdict) + '</div>';
+   return '<div class="sn"><b>#' + r.rank + ' ' + esc(r.name) + '</b> ' + moneySigned(e.netPerHour) + '/h · net ' + moneySigned(e.net) + '</div>';
   }).join('');
-  $('side').innerHTML = '<h3>How a row is valued</h3>' +
-   '<p>Implied = TVL × curve × growth × maturity. Slice = your share of implied. Net = slice − gas − time − yield forgone.</p>' +
+  var k = DATA.ablation.filter(function (a) { return a.decision === 'KEEP'; }).length, t = DATA.ablation.length - 1;
+  $('side').innerHTML = DATA.odds_ablation_html +
+   '<h3>How a row is valued</h3>' +
+   '<p>TVL × the fitted curve multiple × tilts × the token-odds estimate.</p>' +
    '<h3>FARM NEXT</h3>' + next +
-   '<h3>LOO scatter</h3>' + document.querySelector('.f-scatter').innerHTML;
+   '<h3>LOO scatter</h3>' + document.querySelector('.f-scatter').innerHTML +
+   '<p class="terms-kept">Terms kept by both tests: ' + k + ' of ' + t + ' value · ' + DATA.odds.terms_kept + ' of ' + DATA.odds.terms_total + ' odds.</p>';
  }
  function renderBoard() {
   var list = filteredRows();
@@ -220,7 +223,7 @@
   var html = '';
   if (list.length === rows.length && state.sort === 'rank') {
    var best = topByHour().slice(0, 3);
-   html += '<tr class="anchor"><td colspan="13">Best farms — top 3 by net per hour (the board below ranks all ' + rows.length + ' by implied value)</td></tr>';
+   html += '<tr class="anchor"><td colspan="15">Best farms — top 3 by net per hour (the board below ranks all ' + rows.length + ' by implied value)</td></tr>';
    best.forEach(function (r) { html += rowHtml(r, true); });
   }
   list.forEach(function (r) {
@@ -228,7 +231,7 @@
    var open = state.expanded === r.slug;
    html += rowHtml(r, false, state.detail === r.slug || open, open, cmpOn);
    if (open) html += expandHtml(r);
-   if (anchors[r.rank]) html += '<tr class="anchor"><td colspan="13">' + esc(anchors[r.rank]) + '</td></tr>';
+   if (anchors[r.rank]) html += '<tr class="anchor"><td colspan="15">' + esc(anchors[r.rank]) + '</td></tr>';
   });
   $('board-body').innerHTML = html;
   Array.prototype.forEach.call($('board-body').querySelectorAll('tr[data-slug]'), function (tr) {
@@ -255,7 +258,7 @@
   var fees = 0, slices = 0, net = 0, hrs = 0;
   list.forEach(function (r) { var e = econFor(r); fees += e.cost; slices += e.gross; net += e.net; hrs += MODEL.planHours(r); });
   var n = list.length, be = fees > 0 && slices > fees ? ' · break-even <b>1 in ' + Math.round(slices / fees) + '</b>' : '';
-  $('farmbook').innerHTML = 'Farm book — <b>' + n + '</b> at $' + state.ticket.toLocaleString('en-US') + ': costs <b>' +
+  $('farmbook').innerHTML = 'Farm book — <b>' + n + '</b> at $' + lc(state.ticket) + ': costs <b>' +
    moneySigned(fees) + '</b> · slices <b>' +
    moneySigned(slices) + '</b> · net <b>' + moneySigned(net) + '</b> · ' + hrs.toFixed(1) + ' hours' + be + '.';
  }
@@ -289,12 +292,10 @@
   buildSeg('seg-share', FA.shares, function (s) { return Math.round(s * 100) + '%'; },
    function (s) { return state.share === s; }, function (s) { state.share = s; });
  }
-
  function confidenceText(r) {
   var s = Math.max(0, Math.min(100, Math.round(100 - Math.min(40, 20 * Math.log10(r.p75_usd / r.p25_usd)) - Math.min(30, (r.rank_hi - r.rank_lo) / 2) - (r.age_days == null ? 15 : Math.min(20, 20 * (1 - Math.min(r.age_days, 1095) / 1095))))));
   return (s >= 80 ? 'A' : s >= 60 ? 'B' : s >= 40 ? 'C' : 'D') + ' · ' + s + '/100';
  }
-
  function openDetail(slug) {
   if (!bySlug[slug]) return;
   state.detail = slug;
@@ -310,7 +311,7 @@
    '<div class="ci-inner" style="left:' + at(r.p25_usd).toFixed(1) + '%;right:' + (100 - at(r.p75_usd)).toFixed(1) + '%"></div>' +
    '<div class="ci-point" style="left:' + at(r.implied_value_usd).toFixed(1) + '%"></div></div>' +
    '<div class="ci-labels"><span>P10 ' + money(r.p10_usd) + '</span><span>P25–P75 ' + money(r.p25_usd) + '–' + money(r.p75_usd) + '</span><span>P90 ' + money(r.p90_usd) + '</span></div></div>' +
-   '<p class="oos-note">Bands from LOO misses.</p>';
+   '<p class="oos-note">LOO bands.</p>';
  }
  function compsHtml(r) {
   var near = MODEL.nearestComps(r, DATA.comps, FIT, 4);
@@ -318,7 +319,7 @@
    return '<tr><td>' + esc(n.comp.name) + '</td>' + N + money(n.comp.tvl_usd) + '</td>' + N + money(n.comp.mcap_usd) + '</td>' + N + money(n.curveSays) + '</td>' + N + factor(n.actualDivCurve) + '</td></tr>';
   }).join('');
   var f = near[0];
-  var cross = f ? 'At ' + esc(f.comp.name) + '\u2019s multiple (' + factor(f.comp.multiple) + ' of TVL), this protocol would be worth ' + money(r.tvl_usd * f.comp.multiple) + ' — the model says ' + money(r.implied_value_usd) + '.' : '';
+  var cross = f ? 'At ' + esc(f.comp.name) + '\u2019s multiple (' + factor(f.comp.multiple) + ' of TVL), it would be worth ' + money(r.tvl_usd * f.comp.multiple) + ' — the model says ' + money(r.implied_value_usd) + '.' : '';
   return '<table class="oos"><thead><tr><th>Nearest comp</th>' + H + 'TVL</th>' + H + 'Market cap</th>' + H + 'Curve says</th>' + H + 'Actual ÷ curve</th></tr></thead><tbody>' + body + '</tbody></table><p class="oos-note">' + cross + '</p>';
  }
  function rawHtml(r) {
@@ -330,7 +331,8 @@
   return '<div class="raw">' + f.map(function (x) {
    return '<div><b>' + x[0] + '</b>' + (x[1] == null ? '<span class="null">null</span>' : esc(x[1])) + '</div>';
   }).join('') + '</div>' +
-   '<p class="oos-note">Its snapshot record: mcap, gecko_id, symbol null.</p>';
+   '<p class="oos-note">Snapshot: mcap, gecko_id, symbol null.</p>' +
+   '<p class="oos-note verify-note"><b>Verify first —</b> bookmark the domain from DefiLlama, verify it still records no token.</p>';
  }
  function stepsHtml(r) {
   var sp = MODEL.stepPlan(r);
@@ -343,9 +345,11 @@
   }).join('');
   var drop = Math.round((1 - r.stop_tvl_usd / r.tvl_usd) * 100);
   var why = r.change_7d == null ? 'no 7-day change on record' : '2× its 7-day swing, bounded 5–50%';
+  var lvl = (r.age_days != null && r.age_days < 90) || Math.abs(r.change_7d || 0) > 100 ? 'high' : (r.age_days == null || r.age_days < 365 || r.tvl_usd < DATA.floor_usd) ? 'medium' : 'low';
   return '<p class="oos-note">Stop: unwind below ' + money(r.stop_tvl_usd) + ' TVL (' + drop + '% down — ' + why + ').</p>' +
+   '<p class="oos-note risk-note"><b>Risk: ' + lvl + '</b> — ' + (r.age_days == null ? 'listing date unknown' : r.age_days + ' days of record') + ' · ' + (r.change_7d == null ? 'no 7-day change' : '7-day TVL ' + pct(r.change_7d)) + ' · TVL ' + money(r.tvl_usd) + '.</p>' +
    '<table class="oos steps-table"><thead><tr><th>Step</th>' + H + 'Cost</th>' + H + 'Time</th></tr></thead><tbody>' + items + '</tbody>' +
-   '<tfoot><tr><td>Total — counts the Week-2 move</td>' + N + gasMoney(MODEL.planGas(r)) + ' gas</td>' + N + MODEL.planHours(r).toFixed(1) + ' h</td></tr></tfoot></table>' +
+   '<tfoot><tr><td>Total</td>' + N + gasMoney(MODEL.planGas(r)) + ' gas</td>' + N + MODEL.planHours(r).toFixed(1) + ' h</td></tr></tfoot></table>' +
    '<div class="timeline">' + tl + '</div>';
  }
  function renderDetail() {
@@ -353,7 +357,7 @@
   if (!r) { el.hidden = true; return; }
   var e = econFor(r);
   var cmpOn = state.compare.indexOf(r.slug) >= 0;
-  var from = function (v) { return v == null ? '—' : '$' + v.toLocaleString('en-US'); };
+  var from = function (v) { return v == null ? '—' : '$' + lc(v); };
   var grid = FA.tickets.slice(0, 3).map(function (t) {
    var cells = FA.shares.map(function (s) {
     var g = MODEL.farmEconomics(r, r.implied_value_usd, r.p25_usd, t, s);
@@ -362,8 +366,8 @@
    return '<tr><td>$' + (t >= 1000 ? (t / 1000) + ',000' : t) + '</td>' + cells + '</tr>';
   }).join('');
   var share = r.age_days == null ? null : 90 / (r.age_days + 90);
-  var timeCtx = share == null ? 'its listing date is unknown, so the plan carries no time context' : 'it has run ' + r.age_days + ' days, so the plan covers ' + Math.round(share * 100) + '% of its life at plan end';
-  var sliceLine = 'Slice = ' + Math.round(state.share * 100) + '% × ' + money(r.implied_value_usd) + ' × $' + state.ticket.toLocaleString('en-US') + ' / ' + money(r.tvl_usd) + ' TVL = ' + moneySigned(e.gross) + ' — ' + timeCtx + '.';
+  var timeCtx = share == null ? 'its listing date is unknown, so the plan carries no time context' : 'it has run ' + r.age_days + ' days, so the plan covers ' + Math.round(share * 100) + '% of its life';
+  var sliceLine = 'Slice = ' + Math.round(state.share * 100) + '% × ' + money(r.implied_value_usd) + ' × $' + lc(state.ticket) + ' / ' + money(r.tvl_usd) + ' TVL = ' + moneySigned(e.gross) + ' — ' + timeCtx + '.';
   var dropLine = 'If the launch value drops: ' + [5, 10, 20].map(function (d) {
    var g = MODEL.farmEconomics(r, r.implied_value_usd * (1 - d / 100), r.p25_usd * (1 - d / 100), state.ticket, state.share);
    return '−' + d + '% → net ' + moneySigned(g.net);
@@ -373,7 +377,9 @@
    ['× curve multiple', 'at this TVL', factor(r.size_multiple)],
    ['× growth tilt', r.change_7d == null ? '7-day change unreported' : '7-day change ' + pct(r.change_7d) + (r.change_7d > 100 ? ' · clamped at +100%' : r.change_7d < -50 ? ' · clamped at −50%' : ''), factor(r.growth_multiplier)],
    ['× maturity tilt', ageText(r.age_days), factor(r.maturity_multiplier)],
-   ['= implied value', factor(r.multiple) + ' of TVL', moneyFull(r.implied_value_usd), true],
+   ['= if-launches value', factor(r.multiple) + ' of TVL', moneyFull(r.if_launches_usd)],
+   ['× token odds', 'model estimate — see below', pc(r.ever)],
+   ['= implied value', factor(r.multiple) + ' of TVL × odds', moneyFull(r.implied_value_usd), true],
    ['Confidence', 'band ' + (r.p75_usd / r.p25_usd).toFixed(1) + '× · range ' + r.rank_lo + '–' + r.rank_hi + ' · ' + (r.age_days == null ? 'age unknown' : r.age_days + ' days of record'), confidenceText(r)],
   ]);
   var econ = kvRows([
@@ -393,26 +399,26 @@
    '<p class="detail-meta">' + esc(r.category || 'Uncategorised') + ' · ' + esc(r.chains.join(', ') || 'chain unreported') +
    ' · gas ' + gasMoney(MODEL.gasRate(r)) + ' per action' +
    ' · ' + ageText(r.age_days) + (r.watchlist ? ' · <span class="wl">Watchlist</span>' : '') +
-   ' · rank ' + r.rank_lo + '–' + r.rank_hi + ' in 200 refits</p></div>' +
+   ' · value rank ' + r.rank_lo + '–' + r.rank_hi + ' in 200 refits</p></div>' +
    '<div><button class="cmp-btn' + (cmpOn ? ' on' : '') + '" id="detail-cmp">' + (cmpOn ? '✓ Comparing' : '⇄ Compare') + '</button> ' +
    '<button class="close-btn" id="detail-close">Close ✕</button></div></div>' +
    '<div class="detail-grid"><div>' +
    '<h3>Where the number comes from</h3>' + derive + bandBar(r) +
+   '<h3>Token odds — how the chance is estimated</h3>' + r.odds_html +
    '<h3>Nearest comps</h3>' + compsHtml(r) +
    '<h3>Its snapshot record</h3>' + rawHtml(r) +
    '</div><div>' +
-   '<h3>Is it worth farming? ' + D + 'at $' + state.ticket.toLocaleString('en-US') + ', ' + Math.round(state.share * 100) + '% share</span></h3>' + econ +
-   '<h3>Sensitivity: net at 3 deposits × 3 shares</h3>' +
+   '<h3>Is it worth farming? ' + D + 'at $' + lc(state.ticket) + ', ' + Math.round(state.share * 100) + '% share</span></h3>' + econ +
+   '<h3>Sensitivity: net by deposit × share</h3>' +
    '<table class="oos"><thead><tr><th>Deposit \\ share</th>' + H + '5%</th>' + H + '10%</th>' + H + '20%</th></tr></thead><tbody>' + grid + '</tbody></table>' +
    '<p class="oos-note">' + sliceLine + '</p>' +
    '<p class="oos-note">' + dropLine + '</p>' +
-   '<h3>Farm plan — eight dated steps</h3>' + stepsHtml(r) +
+   '<h3>Farm plan — 8 dated steps</h3>' + stepsHtml(r) +
    '</div></div>';
   el.hidden = false;
   $('detail-close').addEventListener('click', function () { state.detail = null; $('detail').hidden = true; renderBoard(); });
   $('detail-cmp').addEventListener('click', function () { toggleCompare(r.slug); });
  }
-
  function toggleCompare(slug) {
   var at = state.compare.indexOf(slug);
   if (at >= 0) state.compare.splice(at, 1);
@@ -435,41 +441,31 @@
   var cols = state.compare.map(function (slug) {
    var r = bySlug[slug], e = econFor(r);
    return '<div class="compare-col"><h3>#' + r.rank + ' — ' + esc(r.name) + '</h3>' +
-    '<p class="oos-note">' + esc(r.category || 'Uncategorised') + ' · ' + esc(r.chains.slice(0, 2).join(', ')) + ' · rank ' + r.rank_lo + '–' + r.rank_hi + ' in 200 refits</p>' +
+    '<p class="oos-note">' + esc(r.category || 'Uncategorised') + ' · ' + esc(r.chains.slice(0, 2).join(', ')) + ' · value rank ' + r.rank_lo + '–' + r.rank_hi + ' in 200 refits</p>' +
     kvRows([
      ['TVL', '', money(r.tvl_usd)],
      ['Implied value', '', money(r.implied_value_usd)],
      ['P25–P75 band', '', money(r.p25_usd) + ' – ' + money(r.p75_usd)],
-     ['Slice / net at $' + state.ticket.toLocaleString('en-US'), '', moneySigned(e.gross) + ' / ' + moneySigned(e.net)],
+     ['Slice / net at $' + lc(state.ticket), '', moneySigned(e.gross) + ' / ' + moneySigned(e.net)],
      ['Break-even value', '', money(e.breakEven)],
      ['Verdict', '', chip(e.verdict)],
     ]) + '</div>';
   }).join('');
-  el.innerHTML = '<div class="panel-head"><h2>Compare</h2><p class="panel-sub">Side by side.</p></div><div class="compare-grid">' + cols + '</div>';
+  el.innerHTML = '<div class="panel-head"><h2>Compare</h2></div><div class="compare-grid">' + cols + '</div>';
   el.hidden = false;
  }
-
  function renderMethodProse() {
   var cols = [[], []], wide = '';
   DATA.method.forEach(function (s, i) {
    var html = '<h3>' + esc(s.h) + '</h3><p>' + esc(s.p) + '</p>';
    if (i < 4) cols[i < 2 ? 0 : 1].push(html);
-   else wide += html;
+   else wide += i === 5 ? '<div class="judge-note">' + html + '</div>' : html;
   });
   $('method-prose').innerHTML = '<div>' + cols[0].join('') + '</div><div>' + cols[1].join('') + '</div>';
   $('method-prose2').innerHTML = wide;
  }
  function renderAblation() {
-  var head = '<tr><th>Rung</th>' + H + 'LOO</th>' + H + 'SE</th>' + H + '≤3×</th>' + H + 'ρ</th>' + H + 'Walk-fwd</th>' + H + '≤3×</th>' + H + 'ρ</th><th>Decision</th></tr>';
-  var body = DATA.ablation.map(function (a) {
-   var rho = a.decision === 'BASELINE' ? '—' : a.loo_rho.toFixed(2);
-   var rhoW = a.decision === 'BASELINE' ? '—' : a.wf_rho.toFixed(2);
-   return '<tr><td><strong>' + esc(a.name) + '</strong></td>' +
-    N + times(a.loo_x) + '</td>' + N + '±' + a.loo_se_x.toFixed(2) + '</td>' + N + Math.round(a.loo_within_3x * 100) + '%</td>' + N + rho + '</td>' +
-    N + times(a.wf_x) + '</td>' + N + Math.round(a.wf_within_3x * 100) + '%</td>' + N + rhoW + '</td>' +
-    '<td><span class="decision ' + a.decision + '">' + a.decision + '</span></td></tr>';
-  }).join('');
-  $('ablation-table').innerHTML = head + body;
+  $('ablation-table').innerHTML = DATA.ablation_html;
   $('ablation-note').textContent = DATA.ablation_note;
  }
  function renderFit() {
@@ -477,7 +473,7 @@
   var cells = [
    ['Curve slope', f.slope.toFixed(2), 'log–log'],
    ['Multiple at $100M TVL', f.multiple_at_100m.toFixed(3), '80%: ' + f.bootstrap_p10.toFixed(3) + '–' + f.bootstrap_p90.toFixed(3)],
-   ['R², log scale', f.r_squared.toFixed(2), 'log-multiple variance'],
+   ['R², log scale', f.r_squared.toFixed(2), 'log variance'],
    ['Residual SD', f.residual_sd.toFixed(2), 'log units'],
   ];
   $('fit-box').innerHTML = '<dl class="fit-box">' + cells.map(function (c) {
@@ -493,7 +489,6 @@
    }).join('');
  }
  function renderLooScatter() { $('loo-scatter').innerHTML = DATA.loo_scatter_svg; }
-
  function bindControls() {
   function on(id, ev, fn) { $(id).addEventListener(ev, fn); }
   function set(key, id) { return function () { state[key] = $(id).value; renderBoard(); }; }
@@ -548,7 +543,6 @@
   if (shot === 'method') $('method').scrollIntoView({ block: 'start' });
   else if (shot) $('board-section').scrollIntoView({ block: 'start' });
  }
-
  $('meta-snapshot').textContent = 'Snapshot ' + DATA.as_of;
  $('meta-model').textContent = 'model ' + DATA.model_version;
  renderAcct();

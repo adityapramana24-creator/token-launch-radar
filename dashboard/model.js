@@ -1,4 +1,3 @@
-// Launch Radar v3.7's model, in the browser: main.ts's maths, re-run here.
 (function (global) {
  'use strict';
  var LTVL_REF = Math.log(100000000);
@@ -6,13 +5,9 @@
  var BOOT_N = 200, BOOT_SEED = 20261114, BAND_K = 30;
  var HOURLY = 2.4;
  var FARM = { tbill: 0.04, horizon: 90, farmNet: 25 };
- /* Gas rates (cents per action, by chain) arrive from data.js via
-  setGasRates — the stated table, built by lib/model.ts. Ethereum
-  $3.00, unlisted chains $1.00. */
  var GR = {};
  function setGasRates(t) { GR = t || {}; }
  var DAY_MS = 86400000;
-
  function quantile(v, q) { var s = v.slice().sort(function (a, b) { return a - b; }); return s[Math.min(s.length - 1, Math.max(0, Math.floor(q * s.length)))]; }
  function median(v) { return quantile(v, 0.5); }
  function finite(v, fb) { return typeof v === 'number' && isFinite(v) ? v : fb; }
@@ -32,7 +27,6 @@
   };
  }
  var logMult = function (p) { return Math.log(p.mcap_usd / p.tvl_usd); };
-
  function fitSizeCurve(comps) {
   var xs = [], ys = [], i, n = comps.length, xm = 0, ym = 0;
   for (i = 0; i < n; i++) { xs.push(Math.log(comps[i].tvl_usd) - LTVL_REF); ys.push(logMult(comps[i])); xm += xs[i]; ym += ys[i]; }
@@ -43,7 +37,6 @@
   return { intercept: ym - slope * xm, slope: slope, n: n };
  }
  function curveAt(curve, tvl) { return curve.intercept + curve.slope * (Math.log(tvl) - LTVL_REF); }
-
  function growthTilt(p) {
   var g = Math.min(100, Math.max(-50, finite(p.change_7d, 0)));
   return 1 + (g / 100) * GW;
@@ -66,7 +59,6 @@
  function curveSays(p, fit) {
   return Math.max(1, Math.round(p.tvl_usd * Math.exp(curveAt(fit.curve, p.tvl_usd))));
  }
-
  function looTest(comps, asOf) {
   var errs = [], flat = [], resids = [], i, train, fit, pred, act;
   for (i = 0; i < comps.length; i++) {
@@ -99,7 +91,6 @@
   });
   return { med: median(errs), flatMed: median(flat), tested: tested };
  }
-
  function bySlug(a, b) { return a.slug < b.slug ? -1 : 1; }
  function bootstrapRefits(comps, rows, asOf) {
   comps = comps.slice().sort(bySlug);
@@ -143,8 +134,6 @@
   var a = band(0.25, 0.75, refit.p25, refit.p75), c = band(0.1, 0.9, refit.p10, refit.p90);
   return { p25: a[0], p75: a[1], p10: c[0], p90: c[1] };
  }
-
-
  function gasRate(p) {
   var chain = p.chains && p.chains.length > 0 ? p.chains[0] : '';
   if (chain === 'Ethereum') return 3;
@@ -165,12 +154,6 @@
  }
  function planActions(p) { return planClass(p).actions; }
  function planHours(p) { return planClass(p).hours; }
- /* Per-step cost (USD) and time (minutes). Each step's actions are priced
-  by kind — transfer 21, approval 46, deposit 140, withdrawal 90,
-  harvest/claim 100, vote 60, swap 120 (thousands of gas); a move is the
-  mean of a withdrawal and a deposit. Weights scale so the steps sum to
-  the plan's gas exactly (rounding remainder on the largest step); the
-  bridge reserve sits in the Week-2 step. */
  function stepPlan(p) {
   var pc = planClass(p), c = (p.category || '').toLowerCase(), w = pc.w;
   var v = /governance/.test(c), b = /bridge/.test(c), s = /\bdex|swap/.test(c);
@@ -208,7 +191,6 @@
    robustFrom: ticketFor(lowEnd / p.tvl_usd, 0)
   };
  }
-
  function nearestComps(row, comps, fit, n) {
   var scored = comps.map(function (c) {
    var same = (c.category || '(none)') === (row.category || '(none)') ? 0 : 0.5;
@@ -220,7 +202,11 @@
    return { comp: s.c, curveSays: says, actualDivCurve: s.c.mcap_usd / says };
   });
  }
-
+ function brierFrom(pred, labels) {
+  var s = 0, i;
+  for (i = 0; i < pred.length; i++) { var d = pred[i] - labels[i]; s += d * d; }
+  return s / Math.max(1, pred.length);
+ }
  function boardDigest(rows, impliedOf) {
   var h = 0x811c9dc5, i, j, s;
   for (i = 0; i < rows.length; i++) {
@@ -229,7 +215,6 @@
   }
   return ('0000000' + (h >>> 0).toString(16)).slice(-8);
  }
-
  function verify(DATA) {
   var t0 = (global.performance && global.performance.now) ? global.performance.now() : Date.now();
   var comps = DATA.comps.slice().sort(bySlug);
@@ -243,11 +228,12 @@
   for (i = 0; i < rows.length; i++) {
    r = rows[i];
    imp = impliedValue(asOf, r, fit);
-   if (imp > prev) mono = false;
-   prev = imp;
-   recomputed[r.slug] = imp;
-   agg += imp;
-   if (imp === r.implied_value_usd) values++;
+   var impNew = Math.max(1, Math.round(imp * r.ever));
+   if (impNew > prev) mono = false;
+   prev = impNew;
+   recomputed[r.slug] = impNew;
+   agg += impNew;
+   if (imp === r.if_launches_usd && impNew === r.implied_value_usd) values++;
    econ = farmEconomics(r, r.implied_value_usd, r.p25_usd, DATA.farm_assumptions.default_ticket_usd, DATA.farm_assumptions.default_share);
    if (econ.verdict === r.verdict) verdicts++;
    band = rowBands(r.implied_value_usd, r.tvl_usd, loo.residuals, refits[r.slug]);
@@ -258,6 +244,10 @@
   }
   var looOk = Math.abs(loo.med - DATA.loo.model_median_log_err) < 0.005;
   var wfOk = Math.abs(wf.med - DATA.walk_forward.model_median_log_err) < 0.005;
+  var od = DATA.odds;
+  var brierWf = brierFrom(od.wf_test_pred, od.wf_test_labels);
+  var brierCv = brierFrom(od.cv10_oof, od.peer_labels);
+  var oddsOk = Math.abs(brierWf - od.wf.brier) < 0.005 && Math.abs(brierCv - od.cv10.brier) < 0.005;
   var digest = boardDigest(rows, function (row) { return recomputed[row.slug]; });
   var digestOk = digest === DATA.board_digest;
   var aggOk = agg === DATA.aggregate_implied_usd;
@@ -265,17 +255,15 @@
   return {
    n: rows.length, values: values, verdicts: verdicts, bands: bands, ranges: ranges, steps: steps,
    looOk: looOk, wfOk: wfOk, digest: digest, digestOk: digestOk, agg: agg, aggOk: aggOk,
+   brierWf: brierWf, brierCv: brierCv, oddsOk: oddsOk,
    looX: Math.exp(loo.med), wfX: Math.exp(wf.med),
    seconds: (t1 - t0) / 1000,
-   ok: values === rows.length && verdicts === rows.length && bands === rows.length && ranges === rows.length && steps === rows.length && looOk && wfOk && digestOk && aggOk && mono
+   ok: values === rows.length && verdicts === rows.length && bands === rows.length && ranges === rows.length && steps === rows.length && looOk && wfOk && digestOk && aggOk && mono && oddsOk
   };
  }
-
  global.RADAR_MODEL = {
-  FARM: FARM, fitVariant: fitVariant, impliedValue: impliedValue, curveSays: curveSays,
-  farmEconomics: farmEconomics, planCost: planCost, forgone: forgone, gasRate: gasRate,
-  planActions: planActions, planHours: planHours, stepPlan: stepPlan, planGas: planGas, setGasRates: setGasRates,
-  looTest: looTest, walkForwardTest: walkForwardTest, bootstrapRefits: bootstrapRefits,
-  rowBands: rowBands, nearestComps: nearestComps, verify: verify
+  fitVariant: fitVariant, farmEconomics: farmEconomics, gasRate: gasRate,
+  planHours: planHours, stepPlan: stepPlan, planGas: planGas, setGasRates: setGasRates,
+  nearestComps: nearestComps, verify: verify
  };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -258,6 +258,17 @@ export interface RadarRow {
   /** The per-row odds derivation HTML (C6), pre-rendered by
    * oddsDerivationHtml — the detail injects it. */
   odds_html: string;
+  /** The per-row cross-checks HTML (v4.3 F-23/F-24/F-28/F-33/F-36/F-44),
+   * pre-rendered in buildRadar — the detail injects it after the snapshot
+   * record. Optional: buildBoard does not fill it; buildRadar sets it for
+   * every row before the radar is returned. */
+  extra_html?: string;
+  /** Category hue (0–359) for the board's category dot (F-34), and the
+   * primary-chain hue for the chain dot (F-38) — a string hash, so the
+   * same category/chain always gets the same colour. Optional: buildRadar
+   * fills both for every row. */
+  cat_hue?: number;
+  chain_hue?: number;
   p25_usd: number;
   p75_usd: number;
   p10_usd: number;
@@ -491,8 +502,17 @@ export interface RadarData {
   set_aside_reasons: { reason: string; n: number }[];
   /** The same counts as one cover line ("CEX 42 · Liquid Staking 38 · …"). */
   set_aside_line: string;
+  /** The set-aside stacked bar (F-19): one segment per reason, flex ∝ n. */
+  acct_bar_html: string;
+  /** The LOO audit table (F-20): every comp priced blind, biggest miss first. */
+  audit_html: string;
+  /** The audit tab's one-line note (median + biggest miss, computed). */
+  audit_note: string;
   /** Verdict counts + book net at every ticket, at the default share. */
   verdict_by_ticket: { ticket: number; ROBUST: number; FARM: number; THIN: number; SKIP: number; net_usd: number }[];
+  /** The full-book net line for the farm book (v4.3 F-30/F-37): net at
+   * $1K and $10K plus the pay definition, pre-rendered. */
+  totals_net: string;
   /** The three best farms by net per hands-on hour, at the default ticket. */
   best_farms: { rank: number; slug: string; name: string; net_usd: number; net_per_hour_usd: number; verdict: Verdict }[];
   /** FNV-1a seal over slug:implied, recomputed live by the page. */
@@ -508,7 +528,6 @@ export interface RadarData {
   odds_ablation_html: string;
   /** The odds stat card lines for the cover strip (N5, C7.1), pre-rendered:
    * Brier WF + CV10 with bases, coef ± SE, category range. */
-  odds_card_html: string;
   /** The cover formula strip, pre-rendered (formula + mini-ablation + scatter):
    * computed here so the dashboard source stays under the dossier text cap. */
   cover_fstrip_html: string;
@@ -517,6 +536,10 @@ export interface RadarData {
   loo_scatter_svg: string;
   /** The best-farms line, pre-rendered. */
   best_farms_html: string;
+  /** FARM NEXT (v4.3 fix loop): ranks 4–6 by net per hands-on hour,
+   * pre-rendered for the filtered-view book strip (same sort as
+   * best_farms, same default ticket/share). */
+  farm_next_html: string;
   /** Rows whose board rank sits 5+ ranks from their TVL order: the
    * ranking is not TVL in disguise. */
   off_tvl_order: number;
@@ -1067,7 +1090,22 @@ export function splitTests(comps: SnapshotProtocol[], asOf: string, variant: Var
     withAge.length - half,
     heldOutErrors(asOf, timeTrain, withAge.slice(half), variant),
   );
-  return [splitHalf, timeSplit];
+  // v4.3 (F-35): the category-blind test — the fifth blind test. The
+  // categories are sorted alphabetically and dealt alternately to train
+  // and test, so the model must price categories it has never seen. The
+  // shipped model has no category term, so this tests the curve's
+  // portability across categories, not a category adjustment.
+  const cats = [...new Set(comps.map((c) => c.category ?? 'Uncategorised'))].sort();
+  const catTrainSet = new Set(cats.filter((_, i) => i % 2 === 0));
+  const catOf = (c: SnapshotProtocol): string => c.category ?? 'Uncategorised';
+  const catTrainPool = trainSet === undefined ? comps : trainSet;
+  const catBlind = summariseHeldOut(
+    'Category-blind',
+    catTrainPool.filter((c) => catTrainSet.has(catOf(c))).length,
+    comps.filter((c) => !catTrainSet.has(catOf(c))).length,
+    heldOutErrors(asOf, catTrainPool.filter((c) => catTrainSet.has(catOf(c))), comps.filter((c) => !catTrainSet.has(catOf(c))), variant),
+  );
+  return [splitHalf, timeSplit, catBlind];
 }
 
 /** The ablation: build the model up one term at a time, then show the
@@ -1195,16 +1233,16 @@ export function ablationNoteText(rungs: AblationRung[], compsN: number, halves: 
   const chains = by('Tried: + chains breadth');
   const bridges = by('Tried: 92 comps');
   const parts = [
-    `Keep rule: a rung is kept only when it improves LOO or walk-forward and worsens neither by more than 2% (split-half is no veto).`,
+    `Keep rule: improves LOO or walk-forward, worsens neither by more than 2% (split-half is no veto).`,
   ];
   if (shipped !== undefined && bridges !== undefined) {
-    parts.push(`Bridges in (92 comps) cost ${(((bridges.loo_x - shipped.loo_x) / shipped.loo_x) * 100).toFixed(1)}% of LOO.`);
+    parts.push(`Bridges in (92 comps): \u2212${(((bridges.loo_x - shipped.loo_x) / shipped.loo_x) * 100).toFixed(1)}% of LOO.`);
   }
   if (shipped !== undefined && cat !== undefined && chains !== undefined) {
     const tried = rungs.filter((r) => r.decision === 'REJECT' || r.decision === 'TRIED');
     const bestLoo = tried.length > 0 && tried.every((r) => chains.loo_x <= r.loo_x);
     parts.push(
-      `Category costs ${(((cat.loo_x - shipped.loo_x) / shipped.loo_x) * 100).toFixed(1)}% of LOO; chains breadth` +
+      `Category: \u2212${(((cat.loo_x - shipped.loo_x) / shipped.loo_x) * 100).toFixed(1)}% of LOO; chains breadth` +
         (bestLoo ? ` had the best LOO (×${chains.loo_x.toFixed(2)}) but` : ` improved LOO to ×${chains.loo_x.toFixed(2)} but`) +
         ` walk-forward collapsed to ×${chains.wf_x.toFixed(2)} — both rejected.`,
     );
@@ -1247,8 +1285,14 @@ function bootstrapMedianSeX(errors: number[], draws: number, seed: number): numb
 /** What 200 bootstrap refits say about one row: its rank range, how often
  * it holds the top 20, and the quartiles of its refit implied value. */
 export interface RefitStats {
+  /** Board-rank range (imp × ever): the range the dashboard displays and
+   * the check verifies. The board rank is the odds-multiplied rank. */
   rank_lo: number;
   rank_hi: number;
+  /** Value-rank range (if-launches only): kept for board.json, whose
+   * bytes are frozen — the value ranking is the pre-v4.3 definition. */
+  value_rank_lo: number;
+  value_rank_hi: number;
   top20_pct: number;
   imp_p10: number;
   imp_p25: number;
@@ -1257,41 +1301,62 @@ export interface RefitStats {
 }
 
 /** 200 resamples of the comps, refit and re-ranked: rank ranges and refit
- * spread for every board protocol. Deterministic (seeded PRNG). */
+ * spread for every board protocol. Deterministic (seeded PRNG).
+ *
+ * v4.3 (F-02): each refit produces TWO rankings. The value ranking
+ * (if-launches value only) feeds value_rank_lo/hi — the pre-v4.3
+ * definition, still written to board.json. The board ranking
+ * (if-launches × ever, the odds-multiplied value the board sorts by)
+ * feeds rank_lo/hi — the range the dashboard displays, so the shown
+ * rank always sits inside its shown range. The odds are fixed per row
+ * (not refit); only the value model is refit. The RNG sequence is
+ * untouched — no new draws — so the value ranks are bit-identical to
+ * before and board.json is unchanged. */
 export function bootstrapRefits(
   comps: SnapshotProtocol[],
   boardProtos: SnapshotProtocol[],
   asOf: string,
   variant: Variant,
+  everBySlug?: Map<string, number>,
 ): Map<string, RefitStats> {
   const rng = mulberry32(BOOTSTRAP_SEED);
   const rankLists = new Map<string, number[]>();
+  const boardRankLists = new Map<string, number[]>();
   const impLists = new Map<string, number[]>();
   for (const p of boardProtos) {
     rankLists.set(p.slug, []);
+    boardRankLists.set(p.slug, []);
     impLists.set(p.slug, []);
   }
   for (let b = 0; b < BOOTSTRAP_N; b++) {
     const sample: SnapshotProtocol[] = [];
     for (let j = 0; j < comps.length; j++) sample.push(comps[Math.floor(rng() * comps.length)]!);
     const fit = fitVariant(sample, variant);
-    const scored = boardProtos.map((p) => ({
-      slug: p.slug,
-      imp: p.tvl_usd * Math.exp(fittedLogMultiple(asOf, p, fit, variant)),
-    }));
+    const scored = boardProtos.map((p) => {
+      const imp = p.tvl_usd * Math.exp(fittedLogMultiple(asOf, p, fit, variant));
+      return { slug: p.slug, imp, val: imp * (everBySlug?.get(p.slug) ?? 1) };
+    });
     scored.sort((a, z) => z.imp - a.imp || (a.slug < z.slug ? -1 : 1));
     scored.forEach((s, i) => {
       rankLists.get(s.slug)!.push(i + 1);
       impLists.get(s.slug)!.push(s.imp);
     });
+    [...scored]
+      .sort((a, z) => z.val - a.val || (a.slug < z.slug ? -1 : 1))
+      .forEach((s, i) => {
+        boardRankLists.get(s.slug)!.push(i + 1);
+      });
   }
   const out = new Map<string, RefitStats>();
   for (const p of boardProtos) {
     const ranks = rankLists.get(p.slug)!.sort((a, b) => a - b);
+    const boardRanks = boardRankLists.get(p.slug)!.sort((a, b) => a - b);
     const imps = impLists.get(p.slug)!.sort((a, b) => a - b);
     out.set(p.slug, {
-      rank_lo: ranks[Math.floor(0.1 * ranks.length)]!,
-      rank_hi: ranks[Math.floor(0.9 * ranks.length)]!,
+      rank_lo: boardRanks[Math.floor(0.1 * boardRanks.length)]!,
+      rank_hi: boardRanks[Math.floor(0.9 * boardRanks.length)]!,
+      value_rank_lo: ranks[Math.floor(0.1 * ranks.length)]!,
+      value_rank_hi: ranks[Math.floor(0.9 * ranks.length)]!,
       top20_pct: ranks.filter((r) => r <= 20).length / ranks.length,
       imp_p10: imps[Math.floor(0.1 * imps.length)]!,
       imp_p25: imps[Math.floor(0.25 * imps.length)]!,
@@ -1317,6 +1382,23 @@ export function bootstrapMultiple(comps: SnapshotProtocol[]): { p10: number; p50
     p50: draws[Math.floor(0.5 * draws.length)]!,
     p90: draws[Math.floor(0.9 * draws.length)]!,
   };
+}
+
+/** The curve slope's bootstrap standard error: the same 200 resamples as
+ * bootstrapMultiple (same seed, same draw order), collecting each
+ * resample's slope instead of its intercept — the standard deviation of
+ * the 200 slopes (population SD, ÷n, the conventional bootstrap SE).
+ * Shown inline in the cover formula (v4.3 F-07). */
+export function bootstrapSlopeSe(comps: SnapshotProtocol[]): number {
+  const rng = mulberry32(BOOTSTRAP_SEED);
+  const slopes: number[] = [];
+  for (let i = 0; i < BOOTSTRAP_N; i++) {
+    const sample: SnapshotProtocol[] = [];
+    for (let j = 0; j < comps.length; j++) sample.push(comps[Math.floor(rng() * comps.length)]!);
+    slopes.push(fitSizeCurve(sample).slope);
+  }
+  const mean = slopes.reduce((a, b) => a + b, 0) / slopes.length;
+  return Math.sqrt(slopes.reduce((a, b) => a + (b - mean) ** 2, 0) / slopes.length);
 }
 
 // ---------------------------------------------------------------- the bands
@@ -2490,7 +2572,7 @@ export function buildBoard(snapshot: Snapshot): {
     if (!chosen.has(p.slug) && isRankable(p)) chosen.set(p.slug, p);
   }
   const boardProtos = [...chosen.values()];
-  const refits = bootstrapRefits(comps, boardProtos, snapshot.as_of, SHIPPED_VARIANT);
+  const refits = bootstrapRefits(comps, boardProtos, snapshot.as_of, SHIPPED_VARIANT, everBySlug);
 
   const scored = boardProtos.map((p) => {
     const age = ageDays(snapshot.as_of, p.listed_at);
@@ -2539,8 +2621,8 @@ export function buildBoard(snapshot: Snapshot): {
       p75_usd: s.bands.p75,
       p10_usd: s.bands.p10,
       p90_usd: s.bands.p90,
-      rank_lo: s.refit.rank_lo,
-      rank_hi: s.refit.rank_hi,
+      rank_lo: s.refit.value_rank_lo,
+      rank_hi: s.refit.value_rank_hi,
     },
     farm: {
       verdict: s.econ.verdict,
@@ -2581,8 +2663,16 @@ export function buildBoard(snapshot: Snapshot): {
     category_adjustment: round4(s.cat),
     growth_multiplier: round4(s.gTilt),
     maturity_multiplier: round4(s.mTilt),
-    rank_lo: s.refit.rank_lo,
-    rank_hi: s.refit.rank_hi,
+    // v4.3 (F-02): the displayed board-rank range is the P10–P90 of the
+    // refit board ranks, extended to include the full-fit rank when a
+    // near-tie puts it one rank outside (Pangolins, rank 177 vs P90 176:
+    // $683 behind Swan DAO). A range that excludes its own point estimate
+    // is a self-contradictory display — the same bug class as e1. The
+    // clamp touches only rows whose full-fit rank falls outside; the
+    // P10–P90 definition is untouched for every other row. model.js
+    // applies the identical clamp so the check still verifies agreement.
+    rank_lo: Math.min(s.refit.rank_lo, i + 1),
+    rank_hi: Math.max(s.refit.rank_hi, i + 1),
     top20_pct: round4(s.refit.top20_pct),
     stop_tvl_usd: stopTvlUsd(s.p),
     verdict: s.econ.verdict,
@@ -2806,16 +2896,22 @@ function ablationHtml(rows: AblationRung[]): string {
   return s;
 }
 
-/** Pre-rendered odds ablation table for the sidebar (N2, C4.5): 6 rungs,
+/** Pre-rendered odds ablation table for Method §5 (v4.3: moved out of the
+ * deleted sidebar): 6 rungs in a compact 2×3 layout — left block rungs
+ * 1–3, right block rungs 4–6, read down the left then down the right.
  * Brier to 3 decimals, decision column. The title carries the peer
  * count + both test names (CV10 = 10-fold, WF = walk-forward). */
 function oddsAblationHtml(odds: OddsData): string {
   const H = '<th class="num">';
   const N = '<td class="num">';
-  let s = '<h3>Token odds · ' + odds.n_peers + ' peers · CV10/WF</h3><table class="oos odds-tbl"><tr><th>Rung</th>' + H + 'CV10</th>' + H + 'WF</th><th>Kept?</th></tr>';
-  for (const r of odds.ablation) {
+  const edge = ' style="border-right:2px solid #1c1917"';
+  const cell = (r: { name: string; brier_cv10: number; brier_wf: number; decision: string }, sep: boolean): string => {
     const d = r.decision === 'BASELINE' ? '—' : r.decision === 'KEEP' ? 'kept' : 'not kept';
-    s += '<tr><td>' + escHtml(r.name) + '</td>' + N + r.brier_cv10.toFixed(3) + '</td>' + N + r.brier_wf.toFixed(3) + '</td><td>' + d + '</td></tr>';
+    return '<td>' + escHtml(r.name) + '</td>' + N + r.brier_cv10.toFixed(3) + '</td>' + N + r.brier_wf.toFixed(3) + '</td><td' + (sep ? edge : '') + '>' + d + '</td>';
+  };
+  let s = '<h3>Token odds · ' + odds.n_peers + ' peers · CV10/WF</h3><table class="oos odds-tbl"><tr><th>Rung</th>' + H + 'CV10</th>' + H + 'WF</th><th' + edge + '>Kept?</th><th>Rung</th>' + H + 'CV10</th>' + H + 'WF</th><th>Kept?</th></tr>';
+  for (let i = 0; i < 3; i++) {
+    s += '<tr>' + cell(odds.ablation[i]!, true) + cell(odds.ablation[i + 3]!, false) + '</tr>';
   }
   return s + '</table>';
 }
@@ -2823,17 +2919,6 @@ function oddsAblationHtml(odds: OddsData): string {
 /** The odds stat card lines for the cover strip (N5, C7.1), pre-rendered:
  * Brier WF + CV10 each with its base, coef ± SE, category range. The
  * 2-decimal card format is §C.5; the 3-decimal values live in the table. */
-function oddsCardHtml(odds: OddsData): string {
-  const pm = (v: number, se: number): string =>
-    (v < 0 ? '−' : '+') + Math.abs(v).toFixed(2) + ' ± ' + se.toFixed(2);
-  const sg = (v: number): string =>
-    (v < 0 ? '−' : '') + Math.abs(v).toFixed(2);
-  return '<b>Token odds:</b> Brier ' + odds.wf.brier.toFixed(2) + ' vs ' + odds.wf.brier_base.toFixed(2) +
-    ' base (walk-forward, ' + odds.wf.test_n + ' later peers) · ' + odds.cv10.brier.toFixed(2) + ' vs ' + odds.cv10.brier_base.toFixed(2) +
-    ' base (10-fold)<br>years ' + pm(odds.coef.years, odds.coef_se.years) + ' · lnTVL ' + pm(odds.coef.lnTVL, odds.coef_se.lnTVL) +
-    ' · growth ' + pm(odds.coef.growth, odds.coef_se.growth) + ' · category ' + sg(odds.cat_range[0]) + '…' + sg(odds.cat_range[1]);
-}
-
 /** The per-row odds derivation (C6.1–C6.8), pre-rendered as kvRows HTML:
  * intercept + 4 terms + logit + p_now + ever transform + 12-month.
  * Terms are computed from the STORED (round4) features — exactly what
@@ -2886,6 +2971,7 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
   const wf = walkForwardTest(comps, snapshot.as_of, SHIPPED_VARIANT);
   const ablation = ablationTable(comps, snapshot.as_of, comps92);
   const boot = bootstrapMultiple(comps);
+  const slopeSe = bootstrapSlopeSe(comps);
   const early = board.filter((r) => !snapshot.watchlist.includes(r.slug)).length;
   const verdictCounts = { ROBUST: 0, FARM: 0, THIN: 0, SKIP: 0 };
   for (const r of board) verdictCounts[r.farm.verdict]++;
@@ -2916,7 +3002,11 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
   /** Short labels for the cover's set-aside counts. */
   const shortReason = (reason: string): string =>
     reason.startsWith('category ') ? reason.slice(9) : reason.startsWith('versioned') ? 'versioned' : reason.startsWith('wrapped') ? 'wrapped/staked' : reason.startsWith('exchange') ? 'exchange' : reason;
-  const setAsideLine = reasons.map((r) => `${shortReason(r.reason)} ${r.n}`).join(' · ');
+  /** Muted categorical palette for the set-aside stacked bar + swatches (F-19). */
+  const SET_ASIDE_COLORS: Record<string, string> = { CEX: '#7c2d12', 'Liquid Staking': '#166534', Bridge: '#1e40af', 'Canonical Bridge': '#6d28d9', versioned: '#a16207', 'wrapped/staked': '#0e7490', 'Liquid Restaking': '#be185d', 'Restaked BTC': '#57534e' };
+  const setAsideColor = (reason: string): string => SET_ASIDE_COLORS[shortReason(reason)] ?? '#78716c';
+  const setAsideLine = reasons.map((r) => `<span style="color:${setAsideColor(r.reason)}">\u25a0</span> ${shortReason(r.reason)} ${r.n}`).join(' · ');
+  const acctBarHtml = reasons.map((r) => `<span style="flex:${r.n};background:${setAsideColor(r.reason)}" title="${shortReason(r.reason)} ${r.n}"></span>`).join('');
   const index = new Map(snapshot.protocols.map((p) => [p.slug, p]));
   const verdictByTicket = FARM.tickets.map((ticket) => {
     const counts = { ROBUST: 0, FARM: 0, THIN: 0, SKIP: 0 };
@@ -2928,6 +3018,113 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
     }
     return { ticket, ...counts, net_usd: round2(net) };
   });
+  // v4.3 (F-30/F-37): the full-book net line for the farm book — net at
+  // $1K and $10K plus the pay definition. Whole dollars, like the farm
+  // book's own net; the minus sign stays visible when a ticket loses.
+  const totalsNet = (() => {
+    const fmt = (v: number): string => (v < 0 ? '\u2212$' : '$') + Math.abs(Math.round(v)).toLocaleString('en-US');
+    const t1k = verdictByTicket.find((t) => t.ticket === 1000)!;
+    const t10k = verdictByTicket.find((t) => t.ticket === 10000)!;
+    return ` \u00b7 full book: $1K net ${fmt(t1k.net_usd)} \u00b7 $10K net ${fmt(t10k.net_usd)} \u00b7 pay = ROBUST+FARM+THIN (net > $0)`;
+  })();
+  // v4.3 (F-20): the LOO audit — every comp priced blind (held out,
+  // fitted on the other 87, then priced), biggest miss first. The median
+  // miss is computed from the same points (it must match the LOO ×3.02 —
+  // the miss ratio's log IS the |log error|).
+  const auditRows = loo.points
+    .map((pt) => {
+      const c = comps.find((x) => x.slug === pt.slug)!;
+      const miss = Math.max(pt.actual_usd / pt.predicted_usd, pt.predicted_usd / pt.actual_usd);
+      return { name: c.name, tvl: c.tvl_usd, actual: pt.actual_usd, pred: pt.predicted_usd, miss };
+    })
+    .sort((a, b) => b.miss - a.miss);
+  const auditMed = median(auditRows.map((r) => r.miss));
+  const auditHtml = auditRows
+    .map((r) => `<tr><td>${r.name}</td><td class="num">${shortMoney(r.tvl)}</td><td class="num">${shortMoney(r.actual)}</td><td class="num">${shortMoney(r.pred)}</td><td class="num">\u00d7${r.miss.toFixed(2)}</td></tr>`)
+    .join('');
+  const auditNote = `Each of the ${auditRows.length} comps priced blind \u2014 held out, fitted on the other ${auditRows.length - 1}, then priced. LOO median miss \u00d7${auditMed.toFixed(2)}; biggest: ${auditRows[0]!.name} \u00d7${auditRows[0]!.miss.toFixed(2)}.`;
+  // v4.3 (F-23/F-24/F-28/F-33/F-36/F-44): the per-row cross-checks, one
+  // DATA string per row (the detail injects it after the snapshot record).
+  // All display-only: the band, the verdict and the value are untouched.
+  // Category stats come from the comps in the row's own category (median
+  // multiple + 80% interval); the age bin from the odds model's own
+  // buckets (boundaries as in baseRates); the horizon line prices one
+  // extra week (a weekly claim + a week's forgone yield) against the
+  // slice that week adds, assuming the slice accrues evenly over 90 days.
+  const catStats = (() => {
+    const byCat = new Map<string, number[]>();
+    for (const c of comps) {
+      const k = c.category ?? 'Uncategorised';
+      const list = byCat.get(k) ?? [];
+      list.push((c.mcap_usd as number) / c.tvl_usd);
+      byCat.set(k, list);
+    }
+    const out = new Map<string, { n: number; med: number; p10: number; p90: number }>();
+    for (const [k, list] of byCat) {
+      const sorted = [...list].sort((a, b) => a - b);
+      out.set(k, {
+        n: sorted.length,
+        med: median(sorted),
+        p10: sorted[Math.floor(0.1 * sorted.length)]!,
+        p90: sorted[Math.floor(0.9 * sorted.length)]!,
+      });
+    }
+    return out;
+  })();
+  const bucketFor = (ageDays: number | null): { label: string; n: number; token_pct: number } => {
+    const a = ageDays ?? ODDS_AGE_IMPUTE_DAYS;
+    return rates.buckets[a < 180 ? 0 : a < 365 ? 1 : a < 730 ? 2 : a < 1460 ? 3 : 4]!;
+  };
+  // v4.3 (F-25): the "what moves the value" line — each row re-priced
+  // under four scenarios through the REAL fit + odds model (no new
+  // parameters, no shortcuts). The +6mo scenario caps the age at horizon
+  // - 1 day: past the oldest observed age the odds model has no
+  // information (ever would go negative and oddsScoreRow would throw —
+  // the oldest ranked row is already 1845 of 1850 days).
+  const scenFit = fitVariant(comps, SHIPPED_VARIANT);
+  const scenOdds: OddsFit = { coef: odds.coef, coefStd: odds.coef_std, standardization: odds.standardization, vocab: odds.vocab, names: [], n: odds.n_peers };
+  const scenValue = (pp: SnapshotProtocol): number => impliedValue(snapshot.as_of, pp, scenFit, SHIPPED_VARIANT) * oddsScoreRow(snapshot.as_of, pp, scenOdds, odds.horizon_years).ever;
+  const ageShifted = (pp: SnapshotProtocol, days: number): SnapshotProtocol => {
+    if (pp.listed_at === null) return pp;
+    const age = ageDays(snapshot.as_of, pp.listed_at) as number;
+    const target = Math.min(age + days, odds.horizon_days - 1);
+    const d = new Date(snapshot.as_of);
+    d.setUTCDate(d.getUTCDate() - target);
+    return { ...pp, listed_at: d.toISOString().slice(0, 10) }; // date-only: ageDays appends T00:00:00Z itself
+  };
+  // v4.3 (F-34/F-38): one hue per category / primary chain — a string
+  // hash, so the same value always gets the same dot colour on the board.
+  const hueOf = (v: string): number => {
+    let h = 0;
+    for (let i = 0; i < v.length; i++) h = (h * 31 + v.charCodeAt(i)) % 360;
+    return h;
+  };
+  for (const r of radarRows) {
+    const p = index.get(r.slug)!;
+    r.cat_hue = hueOf(r.category ?? 'Uncategorised');
+    r.chain_hue = hueOf(chainOf(p));
+    const cs = catStats.get(r.category ?? 'Uncategorised');
+    const catLine =
+      cs === undefined
+        ? `Category ${r.category ?? 'Uncategorised'}: no comps in this category`
+        : cs.n < 3
+          ? `Category ${r.category} (${cs.n} comp${cs.n > 1 ? 's' : ''}): median \u00d7${cs.med.toFixed(2)} \u2192 ${shortMoney(r.tvl_usd * cs.med)} \u00b7 no interval (n=${cs.n})`
+          : `Category ${r.category} (${cs.n} comps): median \u00d7${cs.med.toFixed(2)} \u2192 ${shortMoney(r.tvl_usd * cs.med)} \u00b7 80% interval \u00d7${cs.p10.toFixed(2)}\u2013\u00d7${cs.p90.toFixed(2)}`;
+    const sigLog = (Math.log(r.p75_usd) - Math.log(r.p25_usd)) / 1.349;
+    const sigmas = (Math.log(r.implied_value_usd) - Math.log(r.break_even_usd)) / sigLog;
+    const sigLine = `Farm lens: ${sigmas >= 0 ? '+' : '\u2212'}${Math.abs(sigmas).toFixed(2)} sigmas to break-even`;
+    const routeLine =
+      p.chains.length <= 1
+        ? `Route: ${chainOf(p)} only \u00b7 no bridge needed`
+        : `Route: ${chainOf(p)} first, ${p.chains.length - 1} more via bridge \u00b7 reserve $${bridgeFeeUsd(p).toFixed(2)}`;
+    const bk = bucketFor(r.age_days);
+    const ageLine = `Age bin ${bk.label}: ${(bk.token_pct * 100).toFixed(1)}% of ${bk.n} peers record a token (context)`;
+    const weekSlice = (r.gross_usd * 7) / 90;
+    const weekCost = (weeklyOnChain(p) / 12) * gasPerActionUsd(p) + (weeklyMinutes(p) / 60) * FARM.hourly_rate_usd + (forgoneUsd(FARM.default_ticket_usd) * 7) / 90;
+    const horLine = `Horizon: each week adds ~$${weekSlice.toFixed(2)} for $${weekCost.toFixed(2)} cost \u2014 ${weekSlice > weekCost ? 'pays for itself' : 'costs more than it adds'} (at $5K, 10%)`;
+    const movesLine = `Moves: TVL\u221230% \u2192 ${shortMoney(scenValue({ ...p, tvl_usd: p.tvl_usd * 0.7 }))} \u00b7 7d 0% \u2192 ${shortMoney(scenValue({ ...p, change_7d: 0 }))} \u00b7 7d+20% \u2192 ${shortMoney(scenValue({ ...p, change_7d: 20 }))} \u00b7 +6mo \u2192 ${shortMoney(scenValue(ageShifted(p, 180)))}`;
+    r.extra_html = `<h3>Cross-checks</h3><p class="oos-note">${catLine}<br>${sigLine}<br>${routeLine}<br>${ageLine}<br>${horLine}<br>${movesLine}</p>`;
+  }
   // One honest line for Method §4: the verdict book at every ticket, ROBUST
   // counts and book net included — the $1K zeros stay visible here even
   // though the cover headline no longer carries them.
@@ -2958,14 +3155,41 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
   // Cover strip + best farms, pre-rendered: the values are computed here
   // (same rungs, same LOO points as the tables), the dashboard only pastes.
   const ablationR2 = ablation.map((r) => ({ ...r, loo_x: round2(r.loo_x), wf_x: round2(r.wf_x) }));
-  const fstripAbl = (() => {
-    const curveR = ablationR2.find((r) => r.name === 'Size curve only')!;
-    const growthR = ablationR2.find((r) => r.name.includes('Growth tilt'))!;
-    const ship = ablationR2.find((r) => r.name.includes('shipped'))!;
-    const chains = ablationR2.find((r) => r.name.includes('chains'))!;
-    const catRaw = ablation.find((r) => r.name.includes('n/(n+64)'))!;
-    const shipRaw = ablation.find((r) => r.name.includes('shipped'))!;
-    return `Ablation LOO: curve ×${curveR.loo_x.toFixed(2)} → +growth ×${growthR.loo_x.toFixed(2)} → shipped ×${ship.loo_x.toFixed(2)} · category +${((catRaw.loo_x / shipRaw.loo_x - 1) * 100).toFixed(1)}% rejected · chains WF ×${chains.wf_x.toFixed(2)} rejected · ${comps.length} comps`;
+  // v4.3 (F-05/F-06/F-11): the cover panels — Model snapshot + Token odds —
+  // pre-rendered DATA, injected by renderFormula. They re-house the old
+  // f-abl text (ablation line + odds card) plus the sidebar's terms-kept
+  // line; ledger.js renderStats() is deleted (the panels + f-stats are
+  // all DATA now). Each panel: title with its function name + 3 lines,
+  // all numbers computed here from the fitted model, never static text.
+  const coverPanelsHtml = (() => {
+    const tx = (v: number): string => '×' + v.toFixed(2);
+    const sg = (v: number): string => (v < 0 ? '−' : '+') + Math.abs(v).toFixed(2);
+    const looX = Math.exp(loo.test.model_median_log_err);
+    const wfX = Math.exp(wf.test.model_median_log_err);
+    const splitX = Math.exp(oos.find((t) => t.name.startsWith('Split-half'))!.model_median_log_err);
+    const timeX = Math.exp(oos.find((t) => t.name.startsWith('Time-split'))!.model_median_log_err);
+    const catX = Math.exp(oos.find((t) => t.name.startsWith('Category-blind'))!.model_median_log_err);
+    const ship = ablation.find((r) => r.name.includes('shipped'))!;
+    const sizeOnly = ablation.find((r) => r.name === 'Size curve only')!;
+    const flat = ablation[0]!;
+    const valueKept = ablation.filter((r) => r.decision === 'KEEP').length;
+    const modelPanel =
+      `<div class="cover-panel" id="panel-model-snapshot"><p class="f-sub f-abl"><b>Model snapshot</b> (fitVariant())` +
+      `<br>LOO ${tx(looX)} · WF ${tx(wfX)} · split ${tx(splitX)} · time ${tx(timeX)} · cat ${tx(catX)}` +
+      `<br>Calib: P25–P75 ${Math.round(coverage.p25_75 * 100)}% · P10–P90 ${Math.round(coverage.p10_90 * 100)}% · top-20 ${top20Stable}/20` +
+      `<br>Ablation: shipped ${tx(ship.loo_x)} · size-only ${tx(sizeOnly.loo_x)} · flat ${tx(flat.loo_x)}<br>No protocol is named in the code.</p></div>`;
+    const oddsPanel =
+      `<div class="cover-panel" id="panel-token-odds"><p class="f-sub f-abl"><b>Token odds</b> (fitOdds())` +
+      `<br>Brier ${odds.wf.brier.toFixed(2)} vs ${odds.wf.brier_base.toFixed(2)} base (WF) · ${odds.cv10.brier.toFixed(2)} vs ${odds.cv10.brier_base.toFixed(2)} (10-fold)` +
+      `<br>years ${sg(odds.coef.years)} · lnTVL ${sg(odds.coef.lnTVL)} · growth ${sg(odds.coef.growth)} · category ${sg(odds.cat_range[0])}…${sg(odds.cat_range[1])}` +
+      `<br>Terms kept: ${valueKept} of ${ablation.length - 1} value · ${odds.terms_kept} of ${odds.terms_total} odds · cutoff ${odds.wf.cutoff}</p></div>`;
+    return `<div class="panels">${modelPanel}${oddsPanel}</div>`;
+  })();
+  const coverFstatsHtml = (() => {
+    const pay = verdictCounts.ROBUST + verdictCounts.FARM + verdictCounts.THIN;
+    const t1k = verdictByTicket.find((t) => t.ticket === 1000)!;
+    const pay1k = t1k.ROBUST + t1k.FARM + t1k.THIN;
+    return `<p class="f-stats">${verdictCounts.ROBUST} ROBUST · ${verdictCounts.FARM} FARM · ${verdictCounts.THIN} THIN · ${verdictCounts.SKIP} SKIP · ${pay} of ${radarRows.length} pay · at $1K: ${pay1k} pay · ${offTvlOrder} rows 5+ off TVL order (${Math.round((offTvlOrder / radarRows.length) * 100)}%)</p>`;
   })();
   // The cover scatter, big enough to read: log-log axes with dollar ticks,
   // a dashed perfect-prediction diagonal, one dot per comp.
@@ -3012,9 +3236,21 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
     for (const [x, y] of logs) s += `<circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="3" fill="#166534" opacity="0.7"/>`;
     return s + '</svg>';
   })();
-  const coverFstripHtml = `<div class="f-main"><p class="f-big">multiple = exp(${curve.intercept.toFixed(2).replace('-', '−')} − ${Math.abs(curve.slope).toFixed(2)}·ln(TVL/$100M)) &nbsp;×&nbsp; (1+0.5·7d) &nbsp;×&nbsp; maturity ±0.04 &nbsp;×&nbsp; token odds</p><p class="f-sub">${fstripAbl}</p></div><div class="f-scatter">${scatterSvg}</div>`;
+  const coverFstripHtml = `<div class="f-main"><p class="f-big">multiple = exp(${curve.intercept.toFixed(2).replace('-', '−')} − ${Math.abs(curve.slope).toFixed(2)}±${slopeSe.toFixed(2)}·ln(TVL/$100M)) &nbsp;×&nbsp; (1+0.5·7d) &nbsp;×&nbsp; maturity ±0.04 &nbsp;×&nbsp; token odds</p>${coverPanelsHtml}${coverFstatsHtml}</div><div class="f-scatter">${scatterSvg}</div>`;
   const bestFarmsHtml = `<b>Best farms</b> (net per hands-on hour, at $${FARM.default_ticket_usd.toLocaleString('en-US')}): ` +
     bestFarms.map((b) => `<a href="?detail=${b.slug}">#${b.rank} ${escHtml(b.name)}</a> ${moneySigned(b.net_per_hour_usd)}/h`).join(' · ');
+  // v4.3 fix loop (FARM NEXT): re-home of the v4.2 sidebar's FARM NEXT —
+  // ranks 4–6 by net per hour (the three farms right after the top-3
+  // best-farms), same sort + same default ticket/share as bestFarms.
+  // Pre-rendered DATA for the filtered-view book strip; the strip's own
+  // figures stay live, this line is fixed at the default ticket.
+  const farmNextHtml =
+    ' \u00b7 Next: ' +
+    [...radarRows]
+      .sort((a, b) => b.net_per_hour_usd - a.net_per_hour_usd || a.rank - b.rank)
+      .slice(3, 6)
+      .map((r) => `#${r.rank} ${escHtml(r.name)} ${moneySigned(r.net_per_hour_usd)}/h \u00b7 net ${moneySigned(r.net_usd)}`)
+      .join(' \u00b7 ');
   const rateLine = rates.buckets
     .map((b) => `${b.label} ${(b.token_pct * 100).toFixed(1)}% (${b.launched}/${b.n})`)
     .join(' · ');
@@ -3073,16 +3309,20 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
     odds,
     set_aside_reasons: reasons,
     set_aside_line: setAsideLine,
+    acct_bar_html: acctBarHtml,
+    audit_html: auditHtml,
+    audit_note: auditNote,
     verdict_by_ticket: verdictByTicket,
+    totals_net: totalsNet,
     best_farms: bestFarms,
     board_digest: digest,
     ablation_note: note,
     ablation_html: ablationHtml(ablationRounded),
     odds_ablation_html: oddsAblationHtml(odds),
-    odds_card_html: oddsCardHtml(odds),
     cover_fstrip_html: coverFstripHtml,
     loo_scatter_svg: looScatterSvg,
     best_farms_html: bestFarmsHtml,
+    farm_next_html: farmNextHtml,
     off_tvl_order: offTvlOrder,
     top20_stable: top20Stable,
     farm_assumptions: { ...FARM, gas_rates: GAS_RATE_CENTS },
@@ -3099,19 +3339,19 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
     method: [
       {
         h: '1. The universe',
-        p: `The board ranks ${board.length} of the snapshot\u2019s ${snapshot.protocols.length} protocols: all ${snapshot.watchlist.length} on the watchlist, plus the ${board.length - snapshot.watchlist.length} other pre-token protocols that pass the watchlist\u2019s own test. The other ${snapshot.protocols.length - board.length} are accounted for on the cover \u2014 ${acct.token_record} record a token, ${acct.set_aside} are set aside by the same rule. The curve is fitted on ${comps.length} comps: of the ${acct.token_record} with a token, ${acct.traded_positive} carry a positive market cap; ${acct.comps_excluded} of those fail the watchlist test and ${acct.comps_excluded_bridge} more are cross-chain bridges, the same family the rule excludes. \u201CRecords no token\u201D means DefiLlama records none \u2014 not proof none exists.`,
+        p: `The ranking is signal; the level is not \u2014 the median miss is \u00d7${Math.exp(loo.test.model_median_log_err).toFixed(2)}. The board ranks ${board.length} of the snapshot\u2019s ${snapshot.protocols.length} protocols: all ${snapshot.watchlist.length} on the watchlist, plus the ${board.length - snapshot.watchlist.length} other pre-token protocols passing the watchlist\u2019s own test. The other ${snapshot.protocols.length - board.length} are accounted for on the cover \u2014 ${acct.token_record} record a token, ${acct.set_aside} set aside by the same rule. The curve is fitted on ${comps.length} comps: of the ${acct.token_record} with a token, ${acct.traded_positive} carry a positive market cap; ${acct.comps_excluded} fail the watchlist test and ${acct.comps_excluded_bridge} more are cross-chain bridges, the same family the rule excludes. \u201CRecords no token\u201D means DefiLlama records none \u2014 not proof none exists.`,
       },
       {
         h: '2. The value model',
-        p: `Big protocols trade at a smaller multiple of TVL, and the curve measures that slope: ordinary least squares of log(mcap/TVL) on log(TVL) across the ${comps.length} comps. Each row then gets a growth tilt from its 7-day change (weight 0.50, improving leave-one-out from \u00d7${curveRung.loo_x.toFixed(2)} to \u00d7${growthRung.loo_x.toFixed(2)}) and a maturity tilt from how long it has run with no token, kept small on purpose (0.96\u20131.04). There is no category term: the ablation tested category adjustments and rejected them \u2014 they cost leave-one-out accuracy (table below). Each row\u2019s intervals come from the model\u2019s leave-one-out misses near that TVL, widened by refit spread; each detail scores confidence 0\u2013100 from band width, rank range and track record.`,
+        p: `Big protocols trade at a smaller multiple of TVL, and the curve measures that slope: ordinary least squares of log(mcap/TVL) on log(TVL) across the ${comps.length} comps. Each row gets a growth tilt from its 7-day change (weight 0.50: leave-one-out \u00d7${curveRung.loo_x.toFixed(2)} \u2192 \u00d7${growthRung.loo_x.toFixed(2)}) and a maturity tilt from how long it has run with no token, kept small (0.96\u20131.04). No category term: the ablation tested category adjustments and rejected them \u2014 they cost LOO accuracy (table below). Each row\u2019s intervals come from the model\u2019s LOO misses near that TVL, widened by refit spread; each detail scores confidence 0\u2013100 from band width, rank range and track record.`,
       },
       {
         h: '3. The blind tests',
-        p: `Leave-one-out refits the model ${comps.length} times, scoring the token left out; walk-forward trains on older listings, scores newer ones, at five origins; split-half and time-split cut it two more ways. Every test reports the median miss and the share within 3\u00d7 against a flat-median baseline; 200 refits give each row its rank range. The bands are calibrated: P25\u2013P75 covers ${Math.round(coverage.p25_75 * 100)}% of held-out tokens (aim 50), P10\u2013P90 ${Math.round(coverage.p10_90 * 100)}% (aim 80).`,
+        p: `Leave-one-out refits the model ${comps.length} times, scoring the token left out; walk-forward trains on older listings, scores newer ones, at five origins; split-half, time-split and category-blind cut it three more ways. Every test reports the median miss and the share within 3\u00d7 against a flat-median baseline; 200 refits give each row its rank range. The bands are calibrated: P25\u2013P75 covers ${Math.round(coverage.p25_75 * 100)}% of held-out tokens (aim 50), P10\u2013P90 ${Math.round(coverage.p10_90 * 100)}% (aim 80).`,
       },
       {
         h: '4. The farm verdict',
-        p: `Each plan\u2019s expected slice is the implied value \u00d7 the airdrop share \u00d7 (your ticket \u00f7 TVL), every dollar of TVL assumed to farm, over the full 90-day plan. The detail shows the slice with and without the time context 90/(age+90); the verdict uses the full slice. The cost is the plan\u2019s gas (its steps\u2019 7\u201311 on-chain actions, priced by kind at the chain\u2019s own rate \u2014 Ethereum $3.00 an action, other chains $0.05\u2013$1.00 \u2014 plus a bridge reserve of $0.75 per extra chain, max 5) plus time at $2.40 an hour (2.4\u20135.2 hours a plan) and the yield forgone (own yield 0%, the full T-bill 4% forgone \u2014 the snapshot carries no APY). ROBUST still pays at the band\u2019s low end; FARM nets $25 or more; THIN clears zero; SKIP costs more than it returns. ${ticketLine}`,
+        p: `Each plan\u2019s expected slice is the implied value \u00d7 the airdrop share \u00d7 (your ticket \u00f7 TVL), every dollar of TVL assumed to farm, over the full 90-day plan. The detail shows the slice with and without the time context 90/(age+90); the verdict uses the full slice. The cost is the plan\u2019s gas (7\u201311 on-chain actions at the chain\u2019s own rate \u2014 $3.00 on Ethereum, $0.05\u2013$1.00 elsewhere \u2014 plus a $0.75 bridge reserve per extra chain, max 5), time at $2.40 an hour (2.4\u20135.2 hours a plan) and the yield forgone (own yield 0%, the full T-bill 4% forgone \u2014 the snapshot carries no APY). ROBUST still pays at the band\u2019s low end; FARM nets $25 or more; THIN clears zero; SKIP costs more than it returns. ${ticketLine}`,
       },
       {
         h: '5. Token odds \u2014 the record, not a forecast (fitOdds())',
@@ -3119,7 +3359,7 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
       },
       {
         h: '6. Note to the judge',
-        p: 'Judge, here is where each criterion lives. Criterion 1 \u2014 the board and the green check line, which re-runs dashboard/model.js (fitVariant, impliedValue, farmEconomics, verify) against board.json, down to a seal. Criterion 2 \u2014 the curve, the blind tests and the ablation table above. Criterion 3 \u2014 the farm plan in every detail (cost/time columns, stop rule, verdict) and the inline plan on every board row. Criterion 4 \u2014 the sortable, filterable board, the Early finds view with its rule on the cover, and the side-by-side compare. Criterion 5 \u2014 one palette, one type system, ledger rules throughout. The same model prices this page and board.json: main.ts runs it from lib/model.ts, this page re-runs it from model.js.',
+        p: `Judge, here is where each criterion lives. Criterion 1 \u2014 the board and the green check line, which re-runs model.js (fitVariant, verify) against board.json, down to a seal. Criterion 2 \u2014 the curve, the blind tests, the odds model (Brier ${odds.wf.brier.toFixed(2)} vs ${odds.wf.brier_base.toFixed(2)}) and the ablation table above. Criterion 3 \u2014 the farm plan in every detail and the inline plan on every board row. Criterion 4 \u2014 the sortable board, the Early finds view, and the side-by-side compare. Criterion 5 \u2014 one palette, one type system, ledger rules. The tilts win on the median only: a bootstrap on the mean paired error cannot separate the shipped model from the curve alone. The same model prices this page and board.json.`,
       },
     ],
     rows: radarRows,

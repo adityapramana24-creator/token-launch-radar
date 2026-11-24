@@ -7,83 +7,89 @@
 </head>
 <body>
 <header class="masthead">
- <div class="wrap mast-in">
-  <div class="brand"><span class="brand-name">Launch Radar</span></div>
-  <div class="mast-meta"><span id="meta-snapshot">Snapshot —</span><span>DefiLlama protocol index</span><span id="meta-model">model —</span></div>
- </div>
+<div class="wrap mast-in">
+<div class="brand"><span class="brand-name">Launch Radar</span></div>
+<div class="mast-meta"><span id="meta-snapshot">Snapshot —</span><span>DefiLlama protocol index</span><span id="meta-model">model —</span><span>Re-run in this browser, no network</span></div>
+</div>
 </header>
 <main class="wrap">
- <section class="hero">
-  <h1>198 protocols without a token, priced from the market.</h1>
-  <p class="lede">All 40 watchlist protocols plus every other pre-token protocol passing its test &mdash; each priced from 88 traded tokens.</p>
-  <div class="acct" id="acct"></div>
-  <p class="acct-sub" id="acct-sub"></p>
-  <p class="check" id="check">Re-running the model in your browser…</p>
-  <div class="fstrip" id="fstrip"></div>
- </section>
- <section class="panel board-panel" id="board-section">
-  <div class="panel-head"><h2>The board</h2><p class="panel-sub">Click a row.</p></div>
-  <div class="tabrow"><div class="tabs" id="tabs"></div><div class="chips" id="chips"></div></div>
-  <div id="board-tab">
-   <p class="oos-note" id="early-rule"></p>
-   <div class="controls">
-    <div class="field grow"><label for="q">Search</label><input type="search" id="q" placeholder="Name, slug or chain"></div>
-    <div class="field wide"><label for="f-cat">Category</label><select id="f-cat"></select></div>
-    <div class="field"><label for="f-chain">Chain</label><select id="f-chain"></select></div>
-    <div class="field"><label for="f-verdict">Verdict</label><select id="f-verdict"></select></div>
-    <div class="field"><label for="f-tvl">Min TVL</label><select id="f-tvl"></select></div>
-    <div class="field"><label for="f-sort">Sort by</label><select id="f-sort"></select></div>
-   </div>
-   <div class="controls econ-controls">
-    <div class="field seg-field"><span class="seg-label">Ticket</span><div class="seg" id="seg-ticket"></div></div>
-    <div class="field seg-field"><span class="seg-label">Airdrop share</span><div class="seg" id="seg-share"></div></div>
-    <p class="econ-note">Net = slice − gas − time − forgone. ROBUST pays at the low end.</p>
-   </div>
-   <div class="bookrow"><p class="farmbook" id="farmbook"></p><p class="count" id="count"></p></div>
-   <div class="board-main">
-   <div class="table-wrap"><table class="board" id="board">
-    <thead><tr><th data-k="rank">#</th><th data-k="name">Protocol</th><th data-k="tvl">TVL</th><th data-k="growth">7d</th><th class="wrap">If launches</th><th class="wrap">Token odds</th><th data-k="rank">Implied</th><th>P25–P75 band</th><th>Slice</th><th data-k="net">Net / low</th><th data-k="breakeven">Break-even</th><th data-k="nethour">$/hr</th><th>Verdict</th><th>Plan</th><th></th></tr></thead>
-    <tbody id="board-body"></tbody>
-   </table></div>
-   <aside class="side" id="side"></aside>
-   </div>
-  </div>
-  <div id="traded-tab" hidden>
-   <p class="count" id="traded-note"></p>
-   <div class="table-wrap"><table class="board" id="traded">
-    <thead><tr><th>Protocol</th><th>Category</th><th>TVL</th><th>Market cap</th><th>mcap / TVL</th></tr></thead>
-    <tbody id="traded-body"></tbody>
-   </table></div>
-  </div>
-  <div id="setaside-tab" hidden>
-   <p class="count" id="setaside-note"></p>
-   <div class="table-wrap"><table class="board" id="setaside">
-    <thead><tr><th>Protocol</th><th>Category</th><th>TVL</th><th>Why it is set aside</th></tr></thead>
-    <tbody id="setaside-body"></tbody>
-   </table></div>
-  </div>
- </section>
- <section class="panel detail-panel" id="detail" hidden></section>
- <section class="panel compare-panel" id="compare" hidden></section>
- <section class="panel method" id="method">
-  <div class="panel-head"><h2>Method and backtest</h2></div>
-  <div class="method-grid" id="method-prose"></div>
-  <div class="backtest-grid">
-   <figure class="chart"><div id="loo-scatter"></div>
-    <figcaption>88 comps: actual across, predicted up.</figcaption>
-   </figure>
-   <div>
-    <h3>The fit, in full (fitVariant())</h3>
-    <div id="fit-box"></div>
-    <table class="oos" id="oos-table"></table>
-   </div>
-  </div>
-  <h3>The ablation: every term earned its place (ablationTable())</h3>
-  <table class="oos" id="ablation-table"></table>
-  <p class="oos-note" id="ablation-note"></p>
-  <div id="method-prose2"></div>
-  <p class="caveat">This radar estimates the chance a protocol ever records a token; it does not predict whether or when any token launches. The record, not a forecast. Implied value is this entry's claim, never make.fun's.</p>
- </section>
+<section class="hero">
+<h1>Launch Radar — 198 protocols, 88 comps, 442 peers</h1>
+<p class="lede">All 40 watchlist protocols plus every other pre-token protocol passing its test &mdash; each priced from 88 traded tokens.</p>
+<div class="acct" id="acct"></div>
+<div id="acct-bar"></div>
+<p class="acct-sub" id="acct-sub"></p>
+<p class="check" id="check">Re-running the model in your browser…</p>
+<div class="fstrip" id="fstrip"></div>
+</section>
+<section class="panel board-panel" id="board-section">
+<div class="panel-head"><h2>The board</h2><p class="panel-sub">Click a row. ★ watchlist · ● category · ■ chain</p></div>
+<div class="tabrow"><div class="tabs" id="tabs"></div><div class="chips" id="chips"></div></div>
+<div id="board-tab">
+<p class="oos-note" id="early-rule"></p>
+<div class="controls">
+<div class="field grow"><label for="q">Search</label><input type="search" id="q" placeholder="Name, slug or chain"></div>
+<div class="field wide"><label for="f-cat">Category</label><select id="f-cat"></select></div>
+<div class="field"><label for="f-chain">Chain</label><select id="f-chain"></select></div>
+<div class="field"><label for="f-verdict">Verdict</label><select id="f-verdict"></select></div>
+<div class="field"><label for="f-tvl">Min TVL</label><select id="f-tvl"></select></div>
+<div class="field"><label for="f-sort">Sort by</label><select id="f-sort"></select></div>
+</div>
+<div class="controls econ-controls">
+<div class="field seg-field"><span class="seg-label">Ticket</span><div class="seg" id="seg-ticket"></div></div>
+<div class="field seg-field"><span class="seg-label">Airdrop share</span><div class="seg" id="seg-share"></div></div>
+<p class="econ-note">Net = slice − gas − time − forgone. ROBUST pays at the low end. Export: <button class="cmp-btn" data-export="csv" onclick="exportBoard('csv')">CSV</button> <button class="cmp-btn" data-export="json" onclick="exportBoard('json')">JSON</button></p>
+</div>
+<div class="bookrow"><p class="farmbook" id="farmbook"></p><p class="count" id="count"></p></div>
+<p class="farmbook" id="book-strip" style="display:none"></p>
+<div class="table-wrap"><table class="board" id="board">
+<thead><tr><th data-k="rank">#</th><th data-k="name">Protocol</th><th data-k="tvl">TVL</th><th data-k="growth">7d</th><th>Days listed</th><th class="wrap">If launches</th><th class="wrap">Token odds</th><th data-k="rank">Implied</th><th>Impl ÷ TVL</th><th>P25–P75 band</th><th>Slice</th><th data-k="net">Net / low</th><th data-k="breakeven">Break-even</th><th data-k="nethour">$/hr</th><th>Verdict</th><th>Plan</th><th></th></tr></thead>
+<tbody id="board-body"></tbody>
+</table></div>
+</div>
+<div id="traded-tab" hidden>
+<p class="count" id="traded-note"></p>
+<div class="table-wrap"><table class="board" id="traded">
+<thead><tr><th>Protocol</th><th>Category</th><th>TVL</th><th>Market cap</th><th>mcap / TVL</th></tr></thead>
+<tbody id="traded-body"></tbody>
+</table></div>
+</div>
+<div id="setaside-tab" hidden>
+<p class="count" id="setaside-note"></p>
+<div class="table-wrap"><table class="board" id="setaside">
+<thead><tr><th>Protocol</th><th>Category</th><th>TVL</th><th>Why it is set aside</th></tr></thead>
+<tbody id="setaside-body"></tbody>
+</table></div>
+</div>
+<div id="audit-tab" hidden>
+<p class="count" id="audit-note"></p>
+<div class="table-wrap"><table class="board" id="audit">
+<thead><tr><th>Protocol</th><th>TVL</th><th>Actual mcap</th><th>LOO predicted</th><th>Miss</th></tr></thead>
+<tbody id="audit-body"></tbody>
+</table></div>
+</div>
+</section>
+<section class="panel detail-panel" id="detail" hidden></section>
+<section class="panel compare-panel" id="compare" hidden></section>
+<section class="panel method" id="method">
+<div class="panel-head"><h2>Method and backtest</h2></div>
+<div class="method-grid" id="method-prose"></div>
+<div class="backtest-grid">
+<figure class="chart"><div id="loo-scatter"></div>
+<figcaption>88 comps: actual across, predicted up.</figcaption>
+</figure>
+<div>
+<h3>The fit, in full (fitVariant())</h3>
+<div id="fit-box"></div>
+<table class="oos" id="oos-table"></table>
+</div>
+</div>
+<h3>The ablation: every term earned its place (ablationTable())</h3>
+<table class="oos" id="ablation-table"></table>
+<p class="oos-note" id="ablation-note"></p>
+<div id="method-prose2"></div>
+<p class="caveat">This radar estimates the chance a protocol ever records a token; it does not predict whether or when any token launches. The record, not a forecast. Implied value is this entry's claim, never make.fun's.</p>
+</section>
 </main>
 <script src="../data.js"></script>
 <script src="model.js"></script>
